@@ -17,6 +17,61 @@ let routerQuery = 'frequency', qType = 'frequency', engineMode = 'distributed', 
 let lastCmsTotal = 0, lastPollTime = 0;
 let isDemoMode = false, demoInterval = null;
 let demoStep = 0;
+let showSlaLine = false; // Auto-scale by default to clearly see sub-millisecond variations
+let lastHistories = {};
+
+function toggleSlaLine() {
+  showSlaLine = !showSlaLine;
+  const btn = document.getElementById('slaToggleBtn');
+  const sub = document.getElementById('latChartSub');
+  if (btn) {
+    btn.textContent = showSlaLine ? '🔍 Auto-Zoom Variations (<1ms)' : '📏 Show 20ms SLA Line';
+  }
+  if (sub) {
+    sub.textContent = showSlaLine 
+      ? 'Worker latency vs 20ms SLA threshold line' 
+      : 'Auto-scaled to sub-millisecond variations (~100-200 µs)';
+  }
+  if (latChart) {
+    if (showSlaLine) {
+      latChart.options.scales.y.suggestedMax = 25;
+      latChart.options.scales.y.title.text = 'P99 Latency (ms)';
+    } else {
+      delete latChart.options.scales.y.suggestedMax;
+      latChart.options.scales.y.title.text = 'P99 Latency (ms - Auto-zoomed)';
+    }
+  }
+  updateLatChart(lastHistories);
+}
+
+function toggleHedgedGlobally() {
+  const hedgeCheckbox = document.getElementById('hedgeCheckbox');
+  const badge = document.getElementById('topHedgedBadge');
+  const isNowHedged = hedgeCheckbox ? !hedgeCheckbox.checked : true;
+  if (hedgeCheckbox) hedgeCheckbox.checked = isNowHedged;
+
+  if (badge) {
+    if (isNowHedged) {
+      badge.className = 'pill-badge active-hedged';
+      badge.textContent = '🛡️ Hedging: ACTIVE (Δ=4.5ms)';
+    } else {
+      badge.className = 'pill-badge disabled-hedged';
+      badge.textContent = '🛡️ Hedging: DISABLED';
+    }
+  }
+}
+
+async function cycleCtrlMode() {
+  const modes = ['rl', 'linucb', 'rule'];
+  const curMode = document.getElementById('sysMode')?.textContent?.toLowerCase() || 'rl';
+  let nextIdx = 0;
+  if (curMode.includes('q') || curMode.includes('rl')) nextIdx = 1;
+  else if (curMode.includes('lin')) nextIdx = 2;
+  else nextIdx = 0;
+  const targetMode = modes[nextIdx];
+  const btn = document.getElementById(targetMode === 'rl' ? 'modeBtnRl' : targetMode === 'linucb' ? 'modeBtnLinucb' : 'modeBtnRule');
+  await setCtrlMode(targetMode, btn);
+}
 
 // ── Chart setup ───────────────────────────────────────────
 function initCharts() {
@@ -41,6 +96,14 @@ function initCharts() {
             borderWidth: 1,
             titleColor: '#f1f5f9',
             bodyColor: '#94a3b8',
+            callbacks: {
+              label: function(ctx) {
+                const val = ctx.parsed.y;
+                if (ctx.dataset.label === '20ms SLA Target') return '20ms SLA Target: 20 ms';
+                const us = (val * 1000).toFixed(0);
+                return `${ctx.dataset.label}: ${val.toFixed(3)} ms (${us} µs)`;
+              }
+            }
           },
         },
         scales: {
@@ -50,9 +113,8 @@ function initCharts() {
           },
           y: {
             grid: { color: 'rgba(255, 255, 255, 0.05)' },
-            title: { display: true, text: 'P99 Latency (ms)', color: '#64748b' },
+            title: { display: true, text: 'P99 Latency (ms - Auto-zoomed)', color: '#64748b' },
             suggestedMin: 0,
-            suggestedMax: 25,
           },
         },
       },
@@ -126,27 +188,37 @@ const logCls = m => {
 // ── Chart updates ─────────────────────────────────────────
 function updateLatChart(histories) {
   if (!latChart) return;
+  lastHistories = histories;
   const ids = Object.keys(histories);
   if (!ids.length) return;
 
   const maxLen = Math.max(...ids.map(id => (histories[id] || []).length), 0);
   latChart.data.labels = Array.from({ length: maxLen }, (_, i) => i + 1);
 
-  // Add SLA target dataset (horizontal reference at 20ms)
+  // Manage SLA target dataset
   let slaDs = latChart.data.datasets.find(d => d.label === '20ms SLA Target');
-  if (!slaDs) {
-    slaDs = {
-      label: '20ms SLA Target',
-      data: Array(maxLen).fill(20.0),
-      borderColor: 'rgba(239, 68, 68, 0.65)',
-      borderWidth: 1.5,
-      borderDash: [5, 5],
-      pointRadius: 0,
-      fill: false,
-    };
-    latChart.data.datasets.push(slaDs);
+  if (showSlaLine) {
+    if (!slaDs) {
+      slaDs = {
+        label: '20ms SLA Target',
+        data: Array(maxLen).fill(20.0),
+        borderColor: 'rgba(239, 68, 68, 0.65)',
+        borderWidth: 1.5,
+        borderDash: [5, 5],
+        pointRadius: 0,
+        fill: false,
+      };
+      latChart.data.datasets.push(slaDs);
+    } else {
+      slaDs.data = Array(maxLen).fill(20.0);
+    }
+    latChart.options.scales.y.suggestedMax = 25;
   } else {
-    slaDs.data = Array(maxLen).fill(20.0);
+    // Hide SLA line so chart auto-scales to sub-millisecond data
+    if (slaDs) {
+      latChart.data.datasets = latChart.data.datasets.filter(d => d.label !== '20ms SLA Target');
+    }
+    delete latChart.options.scales.y.suggestedMax;
   }
 
   // Worker datasets
@@ -161,7 +233,7 @@ function updateLatChart(histories) {
         backgroundColor: col + '15',
         tension: 0.3,
         fill: true,
-        pointRadius: 2,
+        pointRadius: 3,
         borderWidth: 2,
       };
       latChart.data.datasets.push(ds);
@@ -169,7 +241,7 @@ function updateLatChart(histories) {
     ds.data = (histories[id] || []).map(Number);
   });
 
-  latChart.data.datasets = latChart.data.datasets.filter(d => d.label === '20ms SLA Target' || ids.includes(d.label));
+  latChart.data.datasets = latChart.data.datasets.filter(d => (showSlaLine && d.label === '20ms SLA Target') || ids.includes(d.label));
   latChart.update('none');
 }
 

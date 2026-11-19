@@ -73,8 +73,8 @@
       </div>
       <div class="topbar-right">
         <div class="top-pills">
-          <span class="pill-badge active-mode" id="topModeBadge">⚡ Q-Learning (108 MDP)</span>
-          <span class="pill-badge" id="topHedgedBadge">🛡️ Hedging Δ=4.5ms</span>
+          <button class="pill-badge active-mode" id="topModeBadge" onclick="cycleCtrlMode()" title="Click to cycle RL / LinUCB / Rule control policies">⚡ Q-Learning (108 MDP)</button>
+          <button class="pill-badge active-hedged" id="topHedgedBadge" onclick="toggleHedgedGlobally()" title="Click to toggle Hedged Straggler Protection">🛡️ Hedging: ACTIVE (Δ=4.5ms)</button>
         </div>
         <button class="btn-action btn-demo" id="demoToggleBtn" onclick="toggleDemoMode()">
           <span id="demoIcon">▶</span> <span id="demoText">Live Demo Feed</span>
@@ -258,9 +258,14 @@
         <div class="card-header">
           <div>
             <div class="card-title">P99 Latency vs SLA Target</div>
-            <div class="card-sub">Millisecond response per worker with 20ms SLA threshold</div>
+            <div class="card-sub" id="latChartSub">Worker response (0.1ms) vs 20ms SLA threshold</div>
           </div>
-          <span class="live-badge">TELEMETRY</span>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <button class="btn-action" id="slaToggleBtn" onclick="toggleSlaLine()" style="padding:3px 9px;font-size:11px;" title="Toggle between auto-zoom on sub-ms variations and 20ms full SLA view">
+              🔍 Zoom Variations (<1ms)
+            </button>
+            <span class="live-badge">TELEMETRY</span>
+          </div>
         </div>
         <div class="chart-wrap"><canvas id="latencyChart"></canvas></div>
       </div>
