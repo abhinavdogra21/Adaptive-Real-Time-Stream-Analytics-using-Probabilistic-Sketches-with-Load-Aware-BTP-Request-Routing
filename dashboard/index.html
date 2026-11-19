@@ -3,9 +3,10 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Stream Analytics — Live Dashboard</title>
+  <title>Stream Analytics — Phase 2 Live Telemetry</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
   <link rel="stylesheet" href="/static/style.css" />
 </head>
@@ -20,6 +21,7 @@
         </svg>
       </div>
       <span>BTP Analytics</span>
+      <span class="logo-tag">Phase 2</span>
     </div>
 
     <nav class="sidebar-nav">
@@ -29,20 +31,26 @@
       </a>
       <a href="/docs" target="_blank" class="nav-item">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-        API Docs
+        Swagger Docs
       </a>
       <a href="/metrics/cluster" target="_blank" class="nav-item">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-        Raw Metrics
+        Raw Cluster JSON
+      </a>
+      <a href="/metrics/partitions" target="_blank" class="nav-item">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+        Partition Topology
       </a>
     </nav>
 
-    <div class="sidebar-section-label">System</div>
+    <div class="sidebar-section-label">Cluster Telemetry</div>
     <div class="system-stats" id="sidebarStats">
-      <div class="sys-row"><span class="sys-label">Workers</span><span class="sys-val" id="sysWorkers">—</span></div>
-      <div class="sys-row"><span class="sys-label">Template</span><span class="sys-val" id="sysTemplate">—</span></div>
-      <div class="sys-row"><span class="sys-label">Cardinality</span><span class="sys-val" id="sysCardinality">—</span></div>
+      <div class="sys-row"><span class="sys-label">Active Workers</span><span class="sys-val" id="sysWorkers">—</span></div>
+      <div class="sys-row"><span class="sys-label">Active Template</span><span class="sys-val" id="sysTemplate">—</span></div>
+      <div class="sys-row"><span class="sys-label">Kafka Shards</span><span class="sys-val" id="sysPartitions">4 Partitions</span></div>
       <div class="sys-row"><span class="sys-label">Total Events</span><span class="sys-val" id="sysTotal">—</span></div>
+      <div class="sys-row"><span class="sys-label">Ingestion Rate</span><span class="sys-val" id="sysThroughput">—</span></div>
+      <div class="sys-row"><span class="sys-label">Control Policy</span><span class="sys-val" id="sysMode">Q-Learning</span></div>
     </div>
 
     <div class="sidebar-footer">
@@ -57,113 +65,202 @@
   <!-- MAIN CONTENT -->
   <div class="content">
 
-    <!-- Top bar -->
+    <!-- TOPBAR -->
     <header class="topbar">
       <div class="topbar-left">
-        <h1 class="page-title">Overview</h1>
-        <span class="page-sub">Adaptive Real-Time Stream Analytics · LNMIIT</span>
+        <h1 class="page-title">Cluster Telemetry & Control Plane</h1>
+        <span class="page-sub">Distributed Stream Analytics · Monoid Merge · Hedged Scatter-Gather</span>
       </div>
       <div class="topbar-right">
-        <div class="algo-tags">
-          <span class="tag">Count-Min Sketch</span>
-          <span class="tag">HyperLogLog</span>
-          <span class="tag">Misra–Gries</span>
+        <div class="top-pills">
+          <span class="pill-badge active-mode" id="topModeBadge">⚡ Q-Learning (108 MDP)</span>
+          <span class="pill-badge" id="topHedgedBadge">🛡️ Hedging Δ=4.5ms</span>
         </div>
-        <button class="refresh-btn" onclick="poll()">↻ Refresh</button>
+        <button class="btn-action btn-demo" id="demoToggleBtn" onclick="toggleDemoMode()">
+          <span id="demoIcon">▶</span> <span id="demoText">Live Demo Feed</span>
+        </button>
+        <button class="btn-action" onclick="poll()">↻ Refresh</button>
       </div>
     </header>
 
-    <!-- LIVE SKETCH ANSWERS -->
+    <!-- HERO LIVE SKETCH CARDS (4 COLUMNS) -->
     <section class="live-answers">
-      <h2 class="section-title">Live Sketch Estimates</h2>
-      <div class="grid-3">
+      <div class="section-head">
+        <h2 class="section-title">Live Probabilistic Sketch Estimators</h2>
+        <span class="badge" id="streamStatusBadge">Continuous Stream Ingestion Active</span>
+      </div>
+      
+      <div class="grid-4">
         <!-- HLL Card -->
-        <div class="answer-card">
-          <div class="answer-header">
-            <span class="answer-title">Unique Items</span>
-            <span class="kpi-tag kpi-tag-blue">HyperLogLog</span>
+        <div class="hero-card card-hll">
+          <div class="card-top">
+            <span class="card-label">Distinct Elements</span>
+            <span class="algo-pill algo-pill-blue">HyperLogLog</span>
           </div>
-          <div class="answer-value" id="ansHllVal">—</div>
-          <div class="answer-desc" id="ansHllErr">Relative error: —</div>
+          <div class="hero-value" id="ansHllVal">—</div>
+          <div class="hero-meta" id="ansHllErr">Relative error: —</div>
+          <div class="hero-foot">Semilattice Coordinate Max (M₁ ⊔ M₂)</div>
         </div>
-        <!-- MG Card -->
-        <div class="answer-card">
-          <div class="answer-header">
-            <span class="answer-title">Top Heavy Hitter</span>
-            <span class="kpi-tag kpi-tag-rose">Misra–Gries</span>
+
+        <!-- Misra-Gries Card -->
+        <div class="hero-card card-mg">
+          <div class="card-top">
+            <span class="card-label">Top Heavy Hitter</span>
+            <span class="algo-pill algo-pill-rose">Misra–Gries</span>
           </div>
-          <div class="answer-value mono answer-value-sm" id="ansMgVal">—</div>
-          <div class="answer-desc" id="ansMgShare">Share of window: —</div>
+          <div class="hero-value mono hero-value-sm" id="ansMgVal">—</div>
+          <div class="hero-meta" id="ansMgShare">Share of window: —</div>
+          <div class="hero-foot">Space-Saving Monoid Merge (Err ≤ N/k)</div>
         </div>
-        <!-- CMS Card -->
-        <div class="answer-card">
-          <div class="answer-header">
-            <span class="answer-title">Top Item Frequency</span>
-            <span class="kpi-tag kpi-tag-violet">Count-Min</span>
+
+        <!-- Count-Min Sketch Card -->
+        <div class="hero-card card-cms">
+          <div class="card-top">
+            <span class="card-label">Top Item Frequency</span>
+            <span class="algo-pill algo-pill-violet">CU Count-Min</span>
           </div>
-          <div class="answer-value" id="ansCmsVal">—</div>
-          <div class="answer-desc" id="ansCmsErr">Error bound: —</div>
+          <div class="hero-value" id="ansCmsVal">—</div>
+          <div class="hero-meta" id="ansCmsErr">Error bound: —</div>
+          <div class="hero-foot">Additive Monoid Merge (A ⊕ B)</div>
+        </div>
+
+        <!-- Hedged Scatter-Gather Card (Phase 2 Highlight!) -->
+        <div class="hero-card card-hedged">
+          <div class="card-top">
+            <span class="card-label">Hedged P99 Tail Latency</span>
+            <span class="algo-pill algo-pill-green">Scatter-Gather</span>
+          </div>
+          <div class="hero-value" id="ansHedgedVal">8.49 <span style="font-size:16px;font-weight:600;">ms</span></div>
+          <div class="hero-meta">
+            <span>Baseline: 73.0 ms</span>
+            <span class="badge-speedup">8.6× Faster</span>
+          </div>
+          <div class="hero-foot">Straggler Hedging (5.65% network overhead)</div>
         </div>
       </div>
     </section>
 
-    <!-- KPI strip -->
-    <section class="kpi-strip">
-      <div class="kpi">
-        <div class="kpi-top">
-          <span class="kpi-label">HLL Cardinality</span>
-          <span class="kpi-tag kpi-tag-blue">HyperLogLog</span>
-        </div>
-        <div class="kpi-val" id="kpiCardinality">—</div>
-        <div class="kpi-foot" id="kpiCardinalityErr">Relative error: —</div>
+    <!-- PARTITION TOPOLOGY & MONOID PIPELINE (NEW PHASE 2 HIGHLIGHT) -->
+    <section class="topology-strip">
+      <div class="section-head">
+        <h2 class="section-title">Kafka Partition Topology & Monoid Merge Pipeline</h2>
+        <span class="badge" id="topoBadge">4 Ingestion Partitions · Hedged Dual-Replica</span>
       </div>
-      <div class="kpi-divider"></div>
-      <div class="kpi">
-        <div class="kpi-top">
-          <span class="kpi-label">CMS Total Events</span>
-          <span class="kpi-tag kpi-tag-violet">Count-Min</span>
+
+      <div class="topology-grid" id="topologyContainer">
+        <!-- Partition 0 -->
+        <div class="partition-box has-worker">
+          <div class="part-header">
+            <span class="part-title">Partition #0</span>
+            <span class="part-status">Healthy</span>
+          </div>
+          <div class="node-pair">
+            <div class="node-role-row">
+              <span class="role-primary">worker-0</span>
+              <span class="role-badge p">Primary</span>
+            </div>
+            <div class="node-role-row">
+              <span class="role-replica">worker-1</span>
+              <span class="role-badge r">Replica</span>
+            </div>
+          </div>
+          <div class="part-monoid-info">
+            <span>CRC32 Hash % 4</span>
+            <span>CMS / HLL / MG</span>
+          </div>
         </div>
-        <div class="kpi-val" id="kpiCmsTotal">—</div>
-        <div class="kpi-foot" id="kpiCmsError">Error bound: —</div>
-      </div>
-      <div class="kpi-divider"></div>
-      <div class="kpi">
-        <div class="kpi-top">
-          <span class="kpi-label">P99 Latency</span>
-          <span class="kpi-tag kpi-tag-green">Best worker</span>
+
+        <!-- Partition 1 -->
+        <div class="partition-box has-worker">
+          <div class="part-header">
+            <span class="part-title">Partition #1</span>
+            <span class="part-status">Healthy</span>
+          </div>
+          <div class="node-pair">
+            <div class="node-role-row">
+              <span class="role-primary">worker-2</span>
+              <span class="role-badge p">Primary</span>
+            </div>
+            <div class="node-role-row">
+              <span class="role-replica">worker-3</span>
+              <span class="role-badge r">Replica</span>
+            </div>
+          </div>
+          <div class="part-monoid-info">
+            <span>CRC32 Hash % 4</span>
+            <span>CMS / HLL / MG</span>
+          </div>
         </div>
-        <div class="kpi-val" id="kpiP99">—</div>
-        <div class="kpi-foot">End-to-end sketch update</div>
-      </div>
-      <div class="kpi-divider"></div>
-      <div class="kpi">
-        <div class="kpi-top">
-          <span class="kpi-label">CPU / Mem Usage</span>
-          <span class="kpi-tag kpi-tag-amber">System</span>
+
+        <!-- Partition 2 -->
+        <div class="partition-box has-worker">
+          <div class="part-header">
+            <span class="part-title">Partition #2</span>
+            <span class="part-status">Healthy</span>
+          </div>
+          <div class="node-pair">
+            <div class="node-role-row">
+              <span class="role-primary">worker-4</span>
+              <span class="role-badge p">Primary</span>
+            </div>
+            <div class="node-role-row">
+              <span class="role-replica">worker-5</span>
+              <span class="role-badge r">Replica</span>
+            </div>
+          </div>
+          <div class="part-monoid-info">
+            <span>CRC32 Hash % 4</span>
+            <span>CMS / HLL / MG</span>
+          </div>
         </div>
-        <div class="kpi-val"><span id="kpiCpu">—</span> / <span id="kpiMem">—</span></div>
-        <div class="kpi-foot">Avg across workers</div>
-      </div>
-      <div class="kpi-divider"></div>
-      <div class="kpi">
-        <div class="kpi-top">
-          <span class="kpi-label">Throughput</span>
-          <span class="kpi-tag kpi-tag-blue">Live</span>
+
+        <!-- Partition 3 -->
+        <div class="partition-box has-worker">
+          <div class="part-header">
+            <span class="part-title">Partition #3</span>
+            <span class="part-status">Healthy</span>
+          </div>
+          <div class="node-pair">
+            <div class="node-role-row">
+              <span class="role-primary">worker-6</span>
+              <span class="role-badge p">Primary</span>
+            </div>
+            <div class="node-role-row">
+              <span class="role-replica">worker-7</span>
+              <span class="role-badge r">Replica</span>
+            </div>
+          </div>
+          <div class="part-monoid-info">
+            <span>CRC32 Hash % 4</span>
+            <span>CMS / HLL / MG</span>
+          </div>
         </div>
-        <div class="kpi-val mono" id="kpiThroughput">—</div>
-        <div class="kpi-foot">Events / second</div>
+
+        <!-- Monoid Aggregator Box -->
+        <div class="monoid-agg-box">
+          <div class="agg-header">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="m10 15 5-3-5-3v6Z"/></svg>
+            Monoid Merge Core
+          </div>
+          <div class="agg-rules">
+            <div>CMS: <span>Σ f_p(x)</span> (Additive)</div>
+            <div>HLL: <span>max R_p[i]</span> (Semilattice)</div>
+            <div>MG: <span>Space-Saving Merge</span></div>
+          </div>
+          <div style="font-size:10px;color:#94a3b8;font-family:var(--font-mono);">Zero Lock Contention · Hedged Δ=4.5ms</div>
+        </div>
       </div>
     </section>
 
-    <!-- Charts row -->
+    <!-- CHARTS ROW -->
     <section class="grid-2">
       <div class="card">
         <div class="card-header">
           <div>
-            <div class="card-title">P99 Latency History</div>
-            <div class="card-sub">per worker · milliseconds</div>
+            <div class="card-title">P99 Latency vs SLA Target</div>
+            <div class="card-sub">Millisecond response per worker with 20ms SLA threshold</div>
           </div>
-          <span class="live-badge">LIVE</span>
+          <span class="live-badge">TELEMETRY</span>
         </div>
         <div class="chart-wrap"><canvas id="latencyChart"></canvas></div>
       </div>
@@ -171,33 +268,75 @@
       <div class="card">
         <div class="card-header">
           <div>
-            <div class="card-title">CPU & Memory per Worker</div>
-            <div class="card-sub">percent of system capacity</div>
+            <div class="card-title">Worker Resource Utilization</div>
+            <div class="card-sub">CPU% (accent) and Memory% (slate) per worker</div>
           </div>
-          <span class="live-badge">LIVE</span>
+          <span class="live-badge">HARDWARE</span>
         </div>
         <div class="chart-wrap"><canvas id="memoryChart"></canvas></div>
       </div>
     </section>
 
-    <!-- Bottom row -->
+    <!-- MIDDLE ROW: HEAVY HITTERS, RL CONTROLLER, ROUTER -->
     <section class="grid-3">
 
-      <!-- Heavy hitters -->
+      <!-- Heavy Hitters -->
       <div class="card">
         <div class="card-header">
-          <div class="card-title">Heavy Hitters</div>
+          <div class="card-title">Top Misra-Gries Heavy Hitters</div>
           <span class="badge" id="mgWindow">N = —</span>
         </div>
-        <table class="data-table">
-          <thead><tr><th>#</th><th>Item</th><th>Count</th><th>Share</th></tr></thead>
-          <tbody id="hhTableBody">
-            <tr><td colspan="4" class="empty">Waiting for data…</td></tr>
-          </tbody>
-        </table>
+        <div style="max-height: 270px; overflow-y: auto;">
+          <table class="data-table">
+            <thead>
+              <tr><th>#</th><th>Item Key</th><th>Count</th><th>Window Share</th></tr>
+            </thead>
+            <tbody id="hhTableBody">
+              <tr><td colspan="4" class="empty">Waiting for stream data…</td></tr>
+            </tbody>
+          </table>
+        </div>
       </div>
 
-      <!-- Router scores -->
+      <!-- Adaptive RL Controller Studio -->
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Adaptive RL Controller</div>
+            <div class="card-sub">Online policy optimization & concept drift tracking</div>
+          </div>
+          <div class="tab-group" id="ctrlModeTabs">
+            <button class="tab active" id="modeBtnRl" onclick="setCtrlMode('rl',this)">Q-Learn</button>
+            <button class="tab" id="modeBtnLinucb" onclick="setCtrlMode('linucb',this)">LinUCB</button>
+            <button class="tab" id="modeBtnRule" onclick="setCtrlMode('rule',this)">Rule</button>
+          </div>
+        </div>
+        
+        <div class="rl-hud-strip">
+          <div class="hud-item">
+            <span class="hud-label">Policy Steps</span>
+            <span class="hud-val" id="rlSteps">0</span>
+          </div>
+          <div class="hud-item">
+            <span class="hud-label">Exploration (ε)</span>
+            <span class="hud-val" id="rlEps">—</span>
+          </div>
+          <div class="hud-item">
+            <span class="hud-label">Avg Reward (R̄)</span>
+            <span class="hud-val" id="rlReward">—</span>
+          </div>
+          <div class="hud-item">
+            <span class="hud-label">Drift Triggers</span>
+            <span class="hud-val" id="rlDrifts">0</span>
+          </div>
+        </div>
+
+        <div class="log-box" id="ctrlLog">
+          <p class="empty">No decisions yet — controller runs every 5s</p>
+        </div>
+      </div>
+
+      <!-- Load-Aware Router Scoring -->
       <div class="card">
         <div class="card-header">
           <div class="card-title">Router Node Scores</div>
@@ -211,66 +350,68 @@
           <p class="empty">No workers registered yet</p>
         </div>
         <div class="router-weights">
-          <span>w₁=<b id="w1">0.50</b></span>
-          <span>w₂=<b id="w2">0.30</b></span>
-          <span>w₃=<b id="w3">0.20</b></span>
+          <span>w₁=<b id="w1">0.50</b> (lat)</span>
+          <span>w₂=<b id="w2">0.30</b> (mem)</span>
+          <span>w₃=<b id="w3">0.20</b> (tpl)</span>
         </div>
       </div>
 
-      <!-- Controller log -->
-      <div class="card">
-        <div class="card-header">
-          <div class="card-title">Controller Decisions</div>
-          <div class="tab-group" id="ctrlModeTabs">
-            <button class="tab active" id="modeBtnRl" onclick="setCtrlMode('rl',this)">Q-Learn</button>
-            <button class="tab" id="modeBtnLinucb" onclick="setCtrlMode('linucb',this)">LinUCB</button>
-            <button class="tab" id="modeBtnRule" onclick="setCtrlMode('rule',this)">Rule</button>
-          </div>
-        </div>
-        <div class="router-weights" id="rlStatsBar" style="margin-bottom:8px;">
-          <span>steps=<b id="rlSteps">0</b></span>
-          <span>ε=<b id="rlEps">—</b></span>
-          <span>R̄=<b id="rlReward">—</b></span>
-          <span>drifts=<b id="rlDrifts">0</b></span>
-          <span class="badge" id="ctrlLogCount">0 events</span>
-        </div>
-        <div class="log-box" id="ctrlLog">
-          <p class="empty">No decisions yet</p>
-        </div>
-      </div>
     </section>
 
-    <!-- Lower row: Query + Override -->
+    <!-- LOWER ROW: DUAL QUERY CONSOLE + MANUAL OVERRIDE -->
     <section class="grid-2">
 
-      <!-- Query explorer -->
+      <!-- Interactive Query Console (Dual Engine) -->
       <div class="card">
         <div class="card-header">
-          <div class="card-title">Query Explorer</div>
-          <div class="tab-group" id="queryTabs">
-            <button class="tab active" onclick="setQType('frequency',this)">Frequency</button>
-            <button class="tab" onclick="setQType('cardinality',this)">Cardinality</button>
-            <button class="tab" onclick="setQType('heavy-hitters',this)">Heavy Hitters</button>
+          <div>
+            <div class="card-title">Query Console & Scatter-Gather Playground</div>
+            <div class="card-sub">Test Distributed Hedged Monoid Merge vs Single-Node Routed</div>
+          </div>
+          <div class="tab-group" id="engineTabs">
+            <button class="tab active" id="engineBtnDist" onclick="setEngineMode('distributed',this)">⚡ Distributed Hedged</button>
+            <button class="tab" id="engineBtnSingle" onclick="setEngineMode('single',this)">Routed Single-Node</button>
           </div>
         </div>
+
         <div class="query-area">
-          <div class="query-row" id="queryInputRow">
-            <input id="queryKey" class="text-input mono" type="text" placeholder="item_42" />
-            <button class="btn-primary" onclick="runQuery()">Run</button>
+          <div class="query-controls">
+            <div class="tab-group" id="queryTabs">
+              <button class="tab active" onclick="setQType('frequency',this)">Frequency</button>
+              <button class="tab" onclick="setQType('cardinality',this)">Cardinality</button>
+              <button class="tab" onclick="setQType('heavy-hitters',this)">Heavy Hitters</button>
+            </div>
+
+            <div class="hedge-toggle-wrap" id="hedgingOptionWrap">
+              <input type="checkbox" id="hedgeCheckbox" checked />
+              <label for="hedgeCheckbox">Hedged Request Protection (Δ=6.0ms)</label>
+            </div>
           </div>
-          <pre class="query-out" id="queryResult">// Select a query type and press Run</pre>
+
+          <div class="query-row" id="queryInputRow" style="display:flex;gap:8px;">
+            <input id="queryKey" class="text-input" type="text" placeholder="Enter key (e.g. item_42 or user_101)" value="item_42" />
+            <button class="btn-primary" onclick="runQuery()">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+              Execute Query
+            </button>
+          </div>
+
+          <pre class="query-out" id="queryResult">// Select query parameters above and click Execute Query</pre>
         </div>
       </div>
 
-      <!-- Manual override -->
+      <!-- Precision Override & Zero-Loss Migration -->
       <div class="card">
         <div class="card-header">
-          <div class="card-title">Manual Override</div>
+          <div>
+            <div class="card-title">Worker Precision Control & Zero-Loss Migration</div>
+            <div class="card-sub">Dynamic template tuning with conservative sketch resizing</div>
+          </div>
         </div>
         <div class="override-area">
           <div class="field">
-            <label class="field-label">Worker ID</label>
-            <input id="ctrlWorkerId" class="text-input mono" type="text" placeholder="worker-0" />
+            <label class="field-label">Target Worker ID</label>
+            <input id="ctrlWorkerId" class="text-input" type="text" placeholder="worker-0" value="worker-0" />
           </div>
           <div class="field">
             <label class="field-label">Precision Template</label>
@@ -280,43 +421,43 @@
               <button class="seg" onclick="pickTpl('high',this)">High</button>
             </div>
           </div>
-          <button class="btn-primary full-width" onclick="applyOverride()">Apply</button>
+          <button class="btn-primary" style="justify-content:center;" onclick="applyOverride()">Apply Configuration</button>
           <div id="ctrlStatus" class="override-status"></div>
           <div class="template-hint">
-            <div><b>Low</b> — CMS 512×3, HLL p=10, MG k=50</div>
-            <div><b>Medium</b> — CMS 2048×5, HLL p=12, MG k=200</div>
-            <div><b>High</b> — CMS 8192×7, HLL p=14, MG k=500</div>
+            <div><b>Low:</b> CMS 512×3 · HLL p=10 (1024 regs) · MG k=50 (Min memory footprint)</div>
+            <div><b>Medium:</b> CMS 2048×5 · HLL p=12 (4096 regs) · MG k=200 (Balanced default)</div>
+            <div><b>High:</b> CMS 8192×7 · HLL p=14 (16384 regs) · MG k=500 (Max accuracy)</div>
           </div>
         </div>
       </div>
 
     </section>
 
-    <!-- Algorithm reference -->
+    <!-- ALGORITHM & MONOID ALGEBRA REFERENCE -->
     <section class="algo-row">
       <div class="algo-card">
-        <div class="algo-name">Count-Min Sketch</div>
-        <div class="algo-desc">d×w counter array. Frequency estimated as min over d hash positions.</div>
-        <code class="algo-eq">f̂(x) ≤ f(x) + ε·N, prob 1−δ</code>
-        <div class="algo-params">w=⌈e/ε⌉ &nbsp;·&nbsp; d=⌈ln 1/δ⌉ &nbsp;·&nbsp; O(wd)</div>
+        <div class="algo-name">Count-Min Sketch (CMS)</div>
+        <div class="algo-desc">d×w counter array. Conservative updating minimizes Zipfian collision noise.</div>
+        <code class="algo-eq">(f₁ ⊕ f₂)(x) = f₁(x) + f₂(x) [Monoid]</code>
+        <div class="algo-params">w=⌈e/ε⌉ · d=⌈ln 1/δ⌉ · O(wd) · Additive Merge</div>
       </div>
       <div class="algo-card">
-        <div class="algo-name">HyperLogLog</div>
-        <div class="algo-desc">m=2<sup>p</sup> registers. Estimates cardinality via harmonic mean of leading-zero runs.</div>
-        <code class="algo-eq">Rel. error ≈ 1.04 / √m</code>
-        <div class="algo-params">p=12 → 4096 regs → ±1.6% &nbsp;·&nbsp; O(m)</div>
+        <div class="algo-name">HyperLogLog (HLL)</div>
+        <div class="algo-desc">2<sup>p</sup> registers. Cardinality estimation via normalized harmonic mean.</div>
+        <code class="algo-eq">R_merged[i] = max(R₁[i], R₂[i]) [Semilattice]</code>
+        <div class="algo-params">p=12 → 4096 regs → ±1.62% error · Coordinate Max</div>
       </div>
       <div class="algo-card">
-        <div class="algo-name">Misra–Gries</div>
-        <div class="algo-desc">Keeps k−1 candidates. Items surviving appear &gt; N/k times. Sliding window eviction.</div>
-        <code class="algo-eq">Error ≤ N / k per candidate</code>
-        <div class="algo-params">k candidates &nbsp;·&nbsp; window=10,000 &nbsp;·&nbsp; O(k)</div>
+        <div class="algo-name">Misra–Gries (MG)</div>
+        <div class="algo-desc">k−1 candidates. Agarwal et al. Space-Saving merge with sliding-window eviction.</div>
+        <code class="algo-eq">Err ≤ N / k per candidate [O(k) Merge]</code>
+        <div class="algo-params">k candidates · window=10,000 · Merge-All Fold</div>
       </div>
       <div class="algo-card">
-        <div class="algo-name">Adaptive RL Controller</div>
-        <div class="algo-desc">Online Tabular Q-Learning (108 states) + L1 drift detection. Learns latency/error/memory Pareto policy.</div>
-        <code class="algo-eq">Q(s,a) ← Q + α[r + γ max Q(s′,a′) − Q]</code>
-        <div class="algo-params">ε-greedy decay &nbsp;·&nbsp; Live RL / Rule toggle</div>
+        <div class="algo-name">Hedged Scatter-Gather & RL</div>
+        <div class="algo-desc">Dean & Barroso tail-hedging at threshold Δ + 108-state Q-learning MDP.</div>
+        <code class="algo-eq">T_hedged = min(T_primary, Δ + T_replica)</code>
+        <div class="algo-params">P99: 73ms → 8.5ms (8.6×) · 5.65% overhead</div>
       </div>
     </section>
 
