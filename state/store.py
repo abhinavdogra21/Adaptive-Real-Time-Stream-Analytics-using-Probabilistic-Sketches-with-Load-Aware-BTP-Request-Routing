@@ -47,11 +47,11 @@ class StateStore:
     def _check_connection(self) -> None:
         try:
             self.redis.ping()
-        except redis.ConnectionError as e:
-            raise RuntimeError(
-                f"Cannot connect to Redis at {REDIS_HOST}:{REDIS_PORT}. "
-                "Is Docker running and redis container up?"
-            ) from e
+        except redis.ConnectionError:
+            print(
+                f"[StateStore] Notice: Redis not reachable at {REDIS_HOST}:{REDIS_PORT}. "
+                "Operating in standby/mock mode until Redis connects."
+            )
 
     # ------------------------------------------------------------------
     # Worker metrics
@@ -87,7 +87,10 @@ class StateStore:
 
     def get_all_worker_ids(self) -> List[str]:
         """Return all known worker IDs (may include recently offline ones)."""
-        return list(self.redis.smembers(_WORKERS_SET))
+        try:
+            return list(self.redis.smembers(_WORKERS_SET))
+        except redis.ConnectionError:
+            return []
 
     def get_cluster_metrics(self) -> Dict[str, dict]:
         """Return a dict mapping worker_id → latest metrics for all alive workers."""
@@ -104,19 +107,25 @@ class StateStore:
 
     def log_controller_decision(self, worker_id: str, message: str) -> None:
         """Append a controller decision to the ring-buffer log (last 100 entries)."""
-        entry = json.dumps({
-            "ts": time.time(),
-            "worker_id": worker_id,
-            "message": message,
-        })
-        self.redis.rpush(_CTRL_LOG_KEY, entry)
-        self.redis.ltrim(_CTRL_LOG_KEY, -100, -1)
-        self.redis.expire(_CTRL_LOG_KEY, 3600)
+        try:
+            entry = json.dumps({
+                "ts": time.time(),
+                "worker_id": worker_id,
+                "message": message,
+            })
+            self.redis.rpush(_CTRL_LOG_KEY, entry)
+            self.redis.ltrim(_CTRL_LOG_KEY, -100, -1)
+            self.redis.expire(_CTRL_LOG_KEY, 3600)
+        except redis.ConnectionError:
+            pass
 
     def get_controller_log(self, n: int = 20) -> List[dict]:
         """Return the last n controller decisions."""
-        entries = self.redis.lrange(_CTRL_LOG_KEY, -n, -1)
-        return [json.loads(e) for e in entries]
+        try:
+            entries = self.redis.lrange(_CTRL_LOG_KEY, -n, -1)
+            return [json.loads(e) for e in entries]
+        except redis.ConnectionError:
+            return []
 
     # ------------------------------------------------------------------
     # Router query log
@@ -225,9 +234,15 @@ class StateStore:
 
     def save_controller_stats(self, stats: dict) -> None:
         """Persist live controller telemetry (mode, epsilon, rewards, Q-table summary)."""
-        self.redis.set(_CTRL_STATS_KEY, json.dumps(stats), ex=300)
+        try:
+            self.redis.set(_CTRL_STATS_KEY, json.dumps(stats), ex=300)
+        except redis.ConnectionError:
+            pass
 
     def get_controller_stats(self) -> Optional[dict]:
         """Return latest controller telemetry, or None if unavailable."""
-        raw = self.redis.get(_CTRL_STATS_KEY)
-        return json.loads(raw) if raw else None
+        try:
+            raw = self.redis.get(_CTRL_STATS_KEY)
+            return json.loads(raw) if raw else None
+        except redis.ConnectionError:
+            return None
