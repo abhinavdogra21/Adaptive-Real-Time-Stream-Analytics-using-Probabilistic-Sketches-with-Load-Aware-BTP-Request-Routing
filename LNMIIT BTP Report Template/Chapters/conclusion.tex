@@ -1,5 +1,5 @@
 %% ============================================================
-%%  Chapter 5 — Conclusions and Future Work
+%% Chapter 5 — Conclusions and Future Work
 %% ============================================================
 
 \section{Summary of Project Achievements}
@@ -8,82 +8,82 @@ The \textit{Adaptive Real-Time Stream Analytics using Probabilistic Sketches wit
 
 This section summarises all milestones achieved across both phases.
 
-%% -------  Phase 1  -------
+%% ------- Phase 1 -------
 \subsection{Phase 1: Foundation — Ingestion, Sketches, and Visualization}
 
 Phase~1 established the complete data pipeline from event generation to real-time visualization. The following components were designed, implemented, and validated:
 
 \begin{enumerate}
-    \item \textbf{High-Velocity Stream Ingestion Pipeline:}
-    A robust event generation service was built using Apache Kafka~\cite{kafka}. The producer generates synthetic traffic following a configurable Zipfian distribution~\cite{zipf} (default skewness $s = 1.2$), closely modelling the heavy-tailed patterns observed in real-world systems such as web search, e-commerce, and network telemetry. The producer supports configurable event rates (up to 10,000+ events/second), custom vocabulary sizes, and bounded-duration runs.
+ \item \textbf{High-Velocity Stream Ingestion Pipeline:}
+ A robust event generation service was built using Apache Kafka~\cite{kafka}. The producer generates synthetic traffic following a configurable Zipfian distribution~\cite{zipf} (default skewness $s = 1.2$), closely modelling the heavy-tailed patterns observed in real-world systems such as web search, e-commerce, and network telemetry. The producer supports configurable event rates (up to 10,000+ events/second), custom vocabulary sizes, and bounded-duration runs.
 
-    \item \textbf{Count-Min Sketch (CMS) Implementation:}
-    A fully functional Count-Min Sketch~\cite{cms} was implemented in both Python and C++. The implementation supports three precision templates (Low: $512 \times 3$, Medium: $2048 \times 5$, High: $8192 \times 7$), providing configurable trade-offs between memory usage and error bounds. The no-undercount property ($\hat{f}(x) \le f(x) + \epsilon N$) was mathematically verified via unit tests.
+ \item \textbf{Count-Min Sketch (CMS) Implementation:}
+ A fully functional Count-Min Sketch~\cite{cms} was implemented in both Python and C++. The implementation supports three precision templates (Low: $512 \times 3$, Medium: $2048 \times 5$, High: $8192 \times 7$), providing configurable trade-offs between memory usage and error bounds. The no-undercount property ($\hat{f}(x) \le f(x) + \epsilon N$) was mathematically verified via unit tests.
 
-    \item \textbf{HyperLogLog (HLL) Implementation:}
-    A HyperLogLog cardinality estimator~\cite{hll} was implemented with three precision levels ($p = 10, 12, 14$), offering relative standard errors ranging from $\pm 3.2\%$ to $\pm 0.8\%$. With $p = 12$ (the default), the algorithm estimates millions of unique items using only 6.4~KB of memory.
+ \item \textbf{HyperLogLog (HLL) Implementation:}
+ A HyperLogLog cardinality estimator~\cite{hll} was implemented with three precision levels ($p = 10, 12, 14$), offering relative standard errors ranging from $\pm 3.2\%$ to $\pm 0.8\%$. With $p = 12$ (the default), the algorithm estimates millions of unique items using only 6.4~KB of memory.
 
-    \item \textbf{Sliding-Window Misra--Gries Implementation:}
-    The classic Misra--Gries heavy hitter algorithm~\cite{misra} was extended with a sliding-window variant that naturally ages out old entries, allowing real-time detection of \textit{currently} trending items rather than historically dominant ones. Configurable $k$ parameter values (50, 200, 500) allow trade-offs between detection sensitivity and memory.
+ \item \textbf{Sliding-Window Misra--Gries Implementation:}
+ The classic Misra--Gries heavy hitter algorithm~\cite{misra} was extended with a sliding-window variant that naturally ages out old entries, allowing real-time detection of \textit{currently} trending items rather than historically dominant ones. Configurable $k$ parameter values (50, 200, 500) allow trade-offs between detection sensitivity and memory.
 
-    \item \textbf{Dual-Language Analytics Workers:}
-    Two independent worker implementations were developed:
-    \begin{itemize}
-        \item \textbf{Python Worker:} Uses \texttt{kafka-python-ng} for stream consumption and \texttt{mmh3} for MurmurHash3 hashing. Collects P99 latency, CPU, and memory metrics via \texttt{psutil}.
-        \item \textbf{C++ Worker:} A high-performance drop-in replacement using C++20, \texttt{librdkafka}, and \texttt{xxHash} (XXH64). Achieves approximately $10\times$ faster hashing than the Python counterpart. Uses \texttt{std::countl\_zero()} (single CPU instruction) for HLL and \texttt{std::shared\_mutex} for GIL-free concurrent reads.
-    \end{itemize}
-    Both workers write to the same Redis key schema, ensuring the API, dashboard, and controller are fully language-agnostic.
+ \item \textbf{Dual-Language Analytics Workers:}
+ Two independent worker implementations were developed:
+ \begin{itemize}
+ \item \textbf{Python Worker:} Uses \texttt{kafka-python-ng} for stream consumption and \texttt{mmh3} for MurmurHash3 hashing. Collects P99 latency, CPU, and memory metrics via \texttt{psutil}.
+ \item \textbf{C++ Worker:} A high-performance drop-in replacement using C++20, \texttt{librdkafka}, and \texttt{xxHash} (XXH64). Achieves approximately $10\times$ faster hashing than the Python counterpart. Uses \texttt{std::countl\_zero()} (single CPU instruction) for HLL and \texttt{std::shared\_mutex} for GIL-free concurrent reads.
+ \end{itemize}
+ Both workers write to the same Redis key schema, ensuring the API, dashboard, and controller are fully language-agnostic.
 
-    \item \textbf{Federated State Store (Redis):}
-    Redis~\cite{redis} was deployed as the shared in-memory state store. Workers periodically serialise their sketch summaries, latency metrics, resource usage, and heavy hitter lists to Redis keys. All keys carry a 30-second TTL, ensuring automatic eviction of stale or crashed worker entries without requiring explicit health-check protocols.
+ \item \textbf{Federated State Store (Redis):}
+ Redis~\cite{redis} was deployed as the shared in-memory state store. Workers periodically serialise their sketch summaries, latency metrics, resource usage, and heavy hitter lists to Redis keys. All keys carry a 30-second TTL, ensuring automatic eviction of stale or crashed worker entries without requiring explicit health-check protocols.
 
-    \item \textbf{Analytics REST API (FastAPI):}
-    A comprehensive API backend was built using FastAPI~\cite{fastapi}, exposing query endpoints (frequency, cardinality, heavy hitters), cluster metrics endpoints, controller and router log endpoints, and manual control endpoints. The API is fully documented via auto-generated interactive Swagger documentation.
+ \item \textbf{Analytics REST API (FastAPI):}
+ A comprehensive API backend was built using FastAPI~\cite{fastapi}, exposing query endpoints (frequency, cardinality, heavy hitters), cluster metrics endpoints, controller and router log endpoints, and manual control endpoints. The API is fully documented via auto-generated interactive Swagger documentation.
 
-    \item \textbf{Real-Time Web Dashboard:}
-    A premium, dark-themed single-page web dashboard was developed using vanilla HTML5, CSS3, and JavaScript with Chart.js for interactive charting. The dashboard polls the cluster metrics endpoint every 2 seconds and renders:
-    \begin{itemize}
-        \item Live sketch estimate cards (HLL cardinality, top heavy hitter, CMS frequency)
-        \item Multi-line P99 latency history charts per worker
-        \item CPU and memory usage grouped bar charts
-        \item Ranked heavy hitters table with visual share indicators
-        \item Interactive query explorer for ad-hoc analytics
-        \item Algorithm reference cards with mathematical guarantees
-    \end{itemize}
+ \item \textbf{Real-Time Web Dashboard:}
+ A premium, dark-themed single-page web dashboard was developed using vanilla HTML5, CSS3, and JavaScript with Chart.js for interactive charting. The dashboard polls the cluster metrics endpoint every 2 seconds and renders:
+ \begin{itemize}
+ \item Live sketch estimate cards (HLL cardinality, top heavy hitter, CMS frequency)
+ \item Multi-line P99 latency history charts per worker
+ \item CPU and memory usage grouped bar charts
+ \item Ranked heavy hitters table with visual share indicators
+ \item Interactive query explorer for ad-hoc analytics
+ \item Algorithm reference cards with mathematical guarantees
+ \end{itemize}
 
-    \item \textbf{Concept Drift Simulation:}
-    The stream producer was augmented with a \texttt{--shift-interval} feature that periodically rotates the Zipfian rank distribution, swapping the most frequent item with a random tail item. This simulates non-stationary data streams (concept drift) and demonstrates the sliding-window Misra--Gries sketch's ability to forget old trends and detect new heavy hitters within seconds.
+ \item \textbf{Concept Drift Simulation:}
+ The stream producer was augmented with a \texttt{--shift-interval} feature that periodically rotates the Zipfian rank distribution, swapping the most frequent item with a random tail item. This simulates non-stationary data streams (concept drift) and demonstrates the sliding-window Misra--Gries sketch's ability to forget old trends and detect new heavy hitters within seconds.
 
-    \item \textbf{Docker Compose Deployment:}
-    A complete \texttt{docker-compose.yml} orchestrates all infrastructure services (Kafka, Zookeeper, Redis) and optionally the C++ worker. A multi-stage \texttt{Dockerfile.worker} enables building the C++ worker without local build tools.
+ \item \textbf{Docker Compose Deployment:}
+ A complete \texttt{docker-compose.yml} orchestrates all infrastructure services (Kafka, Zookeeper, Redis) and optionally the C++ worker. A multi-stage \texttt{Dockerfile.worker} enables building the C++ worker without local build tools.
 \end{enumerate}
 
-%% -------  Phase 2  -------
+%% ------- Phase 2 -------
 \subsection{Phase 2: Intelligence — ML-Driven Adaptive Control, Drift Detection, and Zero-Loss Sketches}
 
 Phase~2 upgraded the static Phase~1 rule-based heuristics into an online Machine Learning control plane and resolved core Phase~1 engineering limitations:
 
 \begin{enumerate}
-    \item \textbf{Online Reinforcement Learning Controller (Tabular Q-Learning):}
-    Implemented in \texttt{controller/rl\_agent.py}, replacing static threshold if-else rules with a 108-state MDP agent spanning latency (including a proactive approaching-SLA bucket), memory utilisation, empirical CMS WAPE error, and active precision template. The agent updates $Q(s,a)$ online via TD(0) Bellman updates with $\epsilon$-greedy decay, JSON Q-table persistence, and a positive-baseline composite reward balancing error, nonlinear SLA penalties, and an anti-flapping switch penalty.
+ \item \textbf{Online Reinforcement Learning Controller (Tabular Q-Learning):}
+ Implemented in \texttt{controller/rl\_agent.py}, replacing static threshold if-else rules with a 108-state MDP agent spanning latency (including a proactive approaching-SLA bucket), memory utilisation, empirical CMS WAPE error, and active precision template. The agent updates $Q(s,a)$ online via TD(0) Bellman updates with $\epsilon$-greedy decay, JSON Q-table persistence, and a positive-baseline composite reward balancing error, nonlinear SLA penalties, and an anti-flapping switch penalty.
 
-    \item \textbf{Second ML Baseline — Continuous-Feature LinUCB Contextual Bandit:}
-    Implemented \texttt{LinUCBControllerAgent} operating directly on continuous 6-dimensional context vectors via per-arm ridge regression and UCB exploration, enabling a rigorous ablation comparing \textbf{Static}, \textbf{Rule-Based}, \textbf{Myopic Continuous Bandit (LinUCB)}, and \textbf{Sequential MDP RL (Q-Learning)}. All three controller modes (\texttt{Q-Learn}, \texttt{LinUCB}, \texttt{Rule}) can be toggled live on the web dashboard via \texttt{POST /control/mode}.
+ \item \textbf{Second ML Baseline — Continuous-Feature LinUCB Contextual Bandit:}
+ Implemented \texttt{LinUCBControllerAgent} operating directly on continuous 6-dimensional context vectors via per-arm ridge regression and UCB exploration, enabling a rigorous ablation comparing \textbf{Static}, \textbf{Rule-Based}, \textbf{Myopic Continuous Bandit (LinUCB)}, and \textbf{Sequential MDP RL (Q-Learning)}. All three controller modes (\texttt{Q-Learn}, \texttt{LinUCB}, \texttt{Rule}) can be toggled live on the web dashboard via \texttt{POST /control/mode}.
 
-    \item \textbf{Sketch-Based Concept Drift Detection:}
-    Added $O(K)$ L1 Total Variation Distance (TVD) monitoring across consecutive Misra--Gries heavy-hitter snapshots to detect sudden distributional shifts (such as producer \texttt{--shift-interval} rank swaps) automatically and log live drift telemetry.
+ \item \textbf{Sketch-Based Concept Drift Detection:}
+ Added $O(K)$ L1 Total Variation Distance (TVD) monitoring across consecutive Misra--Gries heavy-hitter snapshots to detect sudden distributional shifts (such as producer \texttt{--shift-interval} rank swaps) automatically and log live drift telemetry.
 
-    \item \textbf{Zero-Data-Loss Template Migration, Conservative-Update CMS, and Live RPC Queries:}
-    Upgraded both Python and C++ Count-Min Sketches with Conservative Updating ($>15\times$ reduction in Zipfian WAPE overestimation), exponential time-decay (\texttt{decay()}), and exact power-of-2 modular bucket folding with bounded fallback on upgrades. HyperLogLog and Misra--Gries now preserve state across precision changes. Added Redis pub/sub-to-list RPC so \texttt{/query/frequency?key=X} returns live point estimates directly from the routed worker.
+ \item \textbf{Zero-Data-Loss Template Migration, Conservative-Update CMS, and Live RPC Queries:}
+ Upgraded both Python and C++ Count-Min Sketches with Conservative Updating ($>15\times$ reduction in Zipfian WAPE overestimation), exponential time-decay (\texttt{decay()}), and exact power-of-2 modular bucket folding with bounded fallback on upgrades. HyperLogLog and Misra--Gries now preserve state across precision changes. Added Redis pub/sub-to-list RPC so \texttt{/query/frequency?key=X} returns live point estimates directly from the routed worker.
 
-    \item \textbf{Comparative Evaluation and Expanded Offline Test Suite:}
-    Benchmarked all five configurations under heterogeneous multi-regime workloads (bursts, memory pressure, and concept drift), generating publication-ready convergence and Pareto comparison plots (\texttt{scripts/plot\_results.py}). Q-Learning achieved the highest composite reward ($+0.5644$), 24\% fewer template switches than Rule-Based (70\% fewer than LinUCB), 22\% lower CMS error than Rule-Based, and 72\% fewer SLA violations than Static. Expanded the fully offline unit test suite to \textbf{49 passing tests}.
+ \item \textbf{Comparative Evaluation and Expanded Offline Test Suite:}
+ Benchmarked all five configurations under heterogeneous multi-regime workloads (bursts, memory pressure, and concept drift), generating publication-ready convergence and Pareto comparison plots (\texttt{scripts/plot\_results.py}). Q-Learning achieved the highest composite reward ($+0.5644$), 24\% fewer template switches than Rule-Based (70\% fewer than LinUCB), 22\% lower CMS error than Rule-Based, and 72\% fewer SLA violations than Static. Expanded the fully offline unit test suite to \textbf{49 passing tests}.
 
-    \item \textbf{Partitioned Ingestion Engine and Hedged Monoid Merge Architecture:}
-    Horizontally scaled the stream architecture by introducing Kafka partitioning with deterministic key hashing ($\text{CRC32}(k) \pmod P$) and hot-standby replica workers. Mathematically formalised and verified Monoid merge algebras $(\mathcal{S}, \oplus, \mathbf{0})$ for Count-Min Sketch (element-wise addition), HyperLogLog (join-semilattice coordinate-wise max), and Misra--Gries (Space-Saving Monoid merge). Implemented an asynchronous \texttt{HedgedScatterGatherEngine} (inspired by Jeffrey Dean's \textit{The Tail at Scale}) that automatically dispatches duplicate requests to replica workers upon exceeding the $P95$ latency threshold ($4.5\text{ ms}$), achieving an \textbf{$>8.5\times$ reduction in P99 query latency} (from $73.00\text{ ms}$ down to $8.49\text{ ms}$) under 5\% worker GC stalls with only 5.65\% network overhead.
+ \item \textbf{Partitioned Ingestion Engine and Hedged Monoid Merge Architecture:}
+ Horizontally scaled the stream architecture by introducing Kafka partitioning with deterministic key hashing ($\text{CRC32}(k) \pmod P$) and hot-standby replica workers. Mathematically formalised and verified Monoid merge algebras $(\mathcal{S}, \oplus, \mathbf{0})$ for Count-Min Sketch (element-wise addition), HyperLogLog (join-semilattice coordinate-wise max), and Misra--Gries (Space-Saving Monoid merge). Implemented an asynchronous \texttt{HedgedScatterGatherEngine} (inspired by Jeffrey Dean's \textit{The Tail at Scale}) that automatically dispatches duplicate requests to replica workers upon exceeding the $P95$ latency threshold ($4.5\text{ ms}$), achieving an \textbf{$>8.5\times$ reduction in P99 query latency} (from $73.00\text{ ms}$ down to $8.49\text{ ms}$) under 5\% worker GC stalls with only 5.65\% network overhead.
 \end{enumerate}
 
-%% -------  Project Timeline  -------
+%% ------- Project Timeline -------
 \subsection{Project Timeline}
 
 \begin{table}[H]
@@ -115,15 +115,15 @@ This project has successfully demonstrated that probabilistic sketch-based analy
 The core technical achievements of this work are:
 
 \begin{enumerate}
-    \item \textbf{Sub-Linear Memory Analytics:} Three probabilistic data structures — Count-Min Sketch, HyperLogLog, and Sliding-Window Misra--Gries — were implemented with mathematically verified error guarantees. The entire sketch state for a medium-precision configuration consumes approximately 100~KB of memory, enabling deployment on resource-constrained environments while processing streams of millions of events.
+ \item \textbf{Sub-Linear Memory Analytics:} Three probabilistic data structures — Count-Min Sketch, HyperLogLog, and Sliding-Window Misra--Gries — were implemented with mathematically verified error guarantees. The entire sketch state for a medium-precision configuration consumes approximately 100~KB of memory, enabling deployment on resource-constrained environments while processing streams of millions of events.
 
-    \item \textbf{Autonomous Adaptation:} The adaptive parameter controller monitors P99 latency, memory pressure, and sketch error in real time, and autonomously transitions workers between precision templates. Workers hot-swap parameters atomically without dropping events, enabling zero-downtime reconfiguration. Experimental evaluation under multi-regime workloads shows that Q-Learning achieves the highest Pareto reward (+0.5644), reducing template flapping by 70\% compared to contextual bandits and cutting SLA violations by 72\% compared to static allocations.
+ \item \textbf{Autonomous Adaptation:} The adaptive parameter controller monitors P99 latency, memory pressure, and sketch error in real time, and autonomously transitions workers between precision templates. Workers hot-swap parameters atomically without dropping events, enabling zero-downtime reconfiguration. Experimental evaluation under multi-regime workloads shows that Q-Learning achieves the highest Pareto reward (+0.5644), reducing template flapping by 70\% compared to contextual bandits and cutting SLA violations by 72\% compared to static allocations.
 
-    \item \textbf{Intelligent Query Distribution:} The load-aware router replaces naive round-robin distribution with a multi-criteria scoring function that considers accuracy capability, latency responsiveness, and memory headroom. This enables automatic failover when workers crash (via Redis TTL-based eviction) and ensures queries are served by the most suitable worker.
+ \item \textbf{Intelligent Query Distribution:} The load-aware router replaces naive round-robin distribution with a multi-criteria scoring function that considers accuracy capability, latency responsiveness, and memory headroom. This enables automatic failover when workers crash (via Redis TTL-based eviction) and ensures queries are served by the most suitable worker.
 
-    \item \textbf{Performance Engineering:} The dual-language worker architecture (Python + C++20) demonstrates that the sketch processing hot path can be accelerated by approximately $10\times$ through hardware-aware hashing (\texttt{xxHash}/XXH64) and compiler-intrinsic bit operations (\texttt{std::countl\_zero}), while maintaining full compatibility with the orchestration layer.
+ \item \textbf{Performance Engineering:} The dual-language worker architecture (Python + C++20) demonstrates that the sketch processing hot path can be accelerated by approximately $10\times$ through hardware-aware hashing (\texttt{xxHash}/XXH64) and compiler-intrinsic bit operations (\texttt{std::countl\_zero}), while maintaining full compatibility with the orchestration layer.
 
-    \item \textbf{Production-Grade Observability:} The real-time web dashboard provides comprehensive visibility into all system components — live sketch estimates, latency trends, resource usage, router scoring, controller decisions, and interactive ad-hoc querying — enabling both operational monitoring and demonstration of adaptive behaviour.
+ \item \textbf{Production-Grade Observability:} The real-time web dashboard provides comprehensive visibility into all system components — live sketch estimates, latency trends, resource usage, router scoring, controller decisions, and interactive ad-hoc querying — enabling both operational monitoring and demonstration of adaptive behaviour.
 \end{enumerate}
 
 The system validates the thesis that \textit{approximate answers with provable bounds, delivered in microseconds, are operationally superior to exact answers delivered in seconds} for high-velocity streaming analytics. This principle underpins modern systems at Netflix (400B events/day), Uber (1T events/day), and Cloudflare (DDoS detection), where sub-linear algorithms are essential.
@@ -135,11 +135,11 @@ The system validates the thesis that \textit{approximate answers with provable b
 While the system achieves all Phase~1 and Phase~2 objectives, several production-scale challenges remain as directions for future research:
 
 \begin{enumerate}
-    \item \textbf{Singleton Controller Process:} Although the adaptive policy is now ML-driven, the controller still runs as a single background task within the API server process, constituting a single point of failure (SPOF) in multi-region deployments.
+ \item \textbf{Singleton Controller Process:} Although the adaptive policy is now ML-driven, the controller still runs as a single background task within the API server process, constituting a single point of failure (SPOF) in multi-region deployments.
 
-    \item \textbf{Point Queries Only:} The Count-Min Sketch supports point frequency queries over the active/decayed stream rather than arbitrary historical time-range queries ($[T_1, T_2]$).
+ \item \textbf{Point Queries Only:} The Count-Min Sketch supports point frequency queries over the active/decayed stream rather than arbitrary historical time-range queries ($[T_1, T_2]$).
 
-    \item \textbf{Static Hedge Threshold Tuning:} The hedging timeout $T_{\text{hedge}}$ is currently set statically based on empirical P95 normal latencies ($4.5\text{ ms}$); dynamically adjusting $T_{\text{hedge}}$ online via an exponential moving quantile estimator would make it fully adaptive to global network jitter.
+ \item \textbf{Static Hedge Threshold Tuning:} The hedging timeout $T_{\text{hedge}}$ is currently set statically based on empirical P95 normal latencies ($4.5\text{ ms}$); dynamically adjusting $T_{\text{hedge}}$ online via an exponential moving quantile estimator would make it fully adaptive to global network jitter.
 \end{enumerate}
 
 

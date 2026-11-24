@@ -3,20 +3,20 @@
 The architecture developed in this work addresses the dual challenges of high-velocity streaming ingestion and low-latency aggregate analytics through a multi-tiered, decoupled distributed pipeline. By decoupling event ingestion from stateful probabilistic summarization and query serving, the platform ensures that transient load spikes or worker reconfigurations do not compromise data availability or ingestion throughput. Ingestion state is durably maintained through partition offsets in Apache Kafka, while summary state is updated locally across distributed worker nodes and queried via an asynchronous load-aware scatter-gather engine.
 
 \begin{figure}[htbp]
-    \centering
-    \includegraphics[width=0.95\textwidth]{Figures/architecture_diagram.png}
-    \caption{End-to-end distributed system architecture. The pipeline integrates a Zipfian stream producer, a partitioned Kafka messaging backbone, dual-language analytical worker nodes (Python and C++20), an in-memory Redis telemetry blackboard, an asynchronous FastAPI query router with hedged scatter-gather execution, and an online Reinforcement Learning control plane.}
-    \label{fig:arch_diagram}
+ \centering
+ \includegraphics[width=0.95\textwidth]{Figures/architecture_diagram.png}
+ \caption{End-to-end distributed system architecture. The pipeline integrates a Zipfian stream producer, a partitioned Kafka messaging backbone, dual-language analytical worker nodes (Python and C++20), an in-memory Redis telemetry blackboard, an asynchronous FastAPI query router with hedged scatter-gather execution, and an online Reinforcement Learning control plane.}
+ \label{fig:arch_diagram}
 \end{figure}
 
 The platform comprises six principal architectural layers, as depicted in Figure~\ref{fig:arch_diagram}:
 \begin{enumerate}
-    \item \textbf{Stream Ingestion and Partitioning Layer:} A multi-threaded synthetic event producer capable of generating highly skewed, non-stationary streams governed by power-law (Zipfian) distributions, published into partitioned Kafka topics.
-    \item \textbf{Decoupled Event Transport Backbone:} An Apache Kafka cluster providing partition-level log persistence, decoupled buffering, and backpressure isolation between stream producers and analytical consumers.
-    \item \textbf{Heterogeneous Analytical Worker Nodes:} Autonomous worker instances implemented in Python and modern C++20 that ingest partitioned streams, execute constant-time sketch updates, collect local operating metrics, and expose live state.
-    \item \textbf{Federated Telemetry and Coordination Store:} A Redis in-memory key-value store acting as a real-time blackboard for worker heartbeat telemetry, latency histograms, sketch error tracking, and controller actuation commands.
-    \item \textbf{Load-Aware Routing and Scatter-Gather Query Plane:} An asynchronous FastAPI service that resolves point queries via utility-scored routing and resolves global cluster-wide aggregate queries via Monoid-based scatter-gather merges with latency hedging.
-    \item \textbf{Online Machine Learning Control Plane:} An autonomous control agent implementing tabular Q-Learning over a 108-state discrete Markov Decision Process (with a continuous LinUCB contextual bandit comparator) to dynamically adapt worker sketch precision templates under varying workloads.
+ \item \textbf{Stream Ingestion and Partitioning Layer:} A multi-threaded synthetic event producer capable of generating highly skewed, non-stationary streams governed by power-law (Zipfian) distributions, published into partitioned Kafka topics.
+ \item \textbf{Decoupled Event Transport Backbone:} An Apache Kafka cluster providing partition-level log persistence, decoupled buffering, and backpressure isolation between stream producers and analytical consumers.
+ \item \textbf{Heterogeneous Analytical Worker Nodes:} Autonomous worker instances implemented in Python and modern C++20 that ingest partitioned streams, execute constant-time sketch updates, collect local operating metrics, and expose live state.
+ \item \textbf{Federated Telemetry and Coordination Store:} A Redis in-memory key-value store acting as a real-time blackboard for worker heartbeat telemetry, latency histograms, sketch error tracking, and controller actuation commands.
+ \item \textbf{Load-Aware Routing and Scatter-Gather Query Plane:} An asynchronous FastAPI service that resolves point queries via utility-scored routing and resolves global cluster-wide aggregate queries via Monoid-based scatter-gather merges with latency hedging.
+ \item \textbf{Online Machine Learning Control Plane:} An autonomous control agent implementing tabular Q-Learning over a 108-state discrete Markov Decision Process (with a continuous LinUCB contextual bandit comparator) to dynamically adapt worker sketch precision templates under varying workloads.
 \end{enumerate}
 
 \section{Stream Ingestion and Partitioning Engine}
@@ -36,13 +36,13 @@ To simulate non-stationary streaming environments and evaluate adaptive mechanis
 \subsection{Partition Topology and Kafka Message Transport}
 The message bus relies on Apache Kafka~\cite{kafka} to decouple high-volume ingestion from downstream processing. Key partitioning strategies and transport characteristics include:
 \begin{itemize}
-    \item \textbf{Deterministic Partition Hashing:} In partitioned cluster topologies, events are dispatched across $P$ Kafka partitions using deterministic key hashing:
-    \begin{equation}
+ \item \textbf{Deterministic Partition Hashing:} In partitioned cluster topologies, events are dispatched across $P$ Kafka partitions using deterministic key hashing:
+ \begin{equation}
         p = \text{CRC32}(k) \pmod P
     \end{equation}
-    This ensures that all occurrences of a specific key $k$ map consistently to partition $p$, enabling exact partitioning of the underlying stream support.
-    \item \textbf{Consumer Group Fanout vs. Partitioned Worker Sharding:} The platform supports two operational modes: (i) an \textit{analytics fan-out mode}, where each worker joins an independent consumer group and ingests the full stream (useful for benchmarking heterogeneous worker implementations), and (ii) a \textit{partitioned sharded mode}, where worker groups coordinate to process disjoint partitions in parallel.
-    \item \textbf{Offset-Based Backpressure Management:} Ingestion workers maintain independent consumer offsets, ensuring zero data loss during transient CPU stalls, memory pressure, or in-flight sketch reallocations.
+ This ensures that all occurrences of a specific key $k$ map consistently to partition $p$, enabling exact partitioning of the underlying stream support.
+ \item \textbf{Consumer Group Fanout vs. Partitioned Worker Sharding:} The platform supports two operational modes: (i) an \textit{analytics fan-out mode}, where each worker joins an independent consumer group and ingests the full stream (useful for benchmarking heterogeneous worker implementations), and (ii) a \textit{partitioned sharded mode}, where worker groups coordinate to process disjoint partitions in parallel.
+ \item \textbf{Offset-Based Backpressure Management:} Ingestion workers maintain independent consumer offsets, ensuring zero data loss during transient CPU stalls, memory pressure, or in-flight sketch reallocations.
 \end{itemize}
 
 \section{Analytical Worker Design}
@@ -52,18 +52,18 @@ Each analytical worker runs as an independent OS process, maintaining local, in-
 \subsection{Python Analytical Worker}
 The reference Python worker is built on an asynchronous event loop utilizing \texttt{kafka-python-ng} for stream ingestion. Hashing operations utilize MurmurHash3 (\texttt{mmh3}) and MD5 digests truncated to 64-bit integer seeds. Key characteristics include:
 \begin{itemize}
-    \item \textbf{Synchronous Processing Hot Path:} Incoming message batches are decoded and dispatched sequentially to sketch data structures in memory.
-    \item \textbf{Windowed Latency Profiling:} Worker telemetry tracks update latencies using a rolling circular buffer of the most recent 500 operations, computing the empirical 95th and 99th percentile latencies ($P95$ and $P99$).
-    \item \textbf{Resource Monitoring:} Host-level resource consumption (CPU utilization percentage and resident memory footprint) is collected every 2 seconds via \texttt{psutil}.
-    \item \textbf{RPC In-Memory Response Engine:} In addition to streaming ingestion, workers maintain a dedicated Redis-based command listener that processes direct RPC query requests for live point frequency lookups.
+ \item \textbf{Synchronous Processing Hot Path:} Incoming message batches are decoded and dispatched sequentially to sketch data structures in memory.
+ \item \textbf{Windowed Latency Profiling:} Worker telemetry tracks update latencies using a rolling circular buffer of the most recent 500 operations, computing the empirical 95th and 99th percentile latencies ($P95$ and $P99$).
+ \item \textbf{Resource Monitoring:} Host-level resource consumption (CPU utilization percentage and resident memory footprint) is collected every 2 seconds via \texttt{psutil}.
+ \item \textbf{RPC In-Memory Response Engine:} In addition to streaming ingestion, workers maintain a dedicated Redis-based command listener that processes direct RPC query requests for live point frequency lookups.
 \end{itemize}
 
 \subsection{High-Performance C++20 Analytical Worker}
 To establish the maximum single-node processing throughput, a drop-in C++20 worker was developed using identical Kafka topic configurations and Redis key schemas. The C++ implementation achieves approximately an order of magnitude higher update rates through several low-level optimizations:
 \begin{itemize}
-    \item \textbf{Hardware-Optimized xxHash (XXH64):} The C++ worker replaces general-purpose hashing with \texttt{XXH64}, an ultra-fast non-cryptographic hash algorithm executing at near-RAM memory bus speeds ($>13\text{ GB/s}$), providing a $\sim 10\times$ throughput improvement over standard MD5/SHA algorithms.
-    \item \textbf{Single-Cycle Bit Manipulation Intrinsics:} In the HyperLogLog register update path, leading-zero counting is implemented using C++20's \texttt{std::countl\_zero()}, which the compiler translates directly into hardware-accelerated CPU instructions (\texttt{LZCNT} on x86-64 or \texttt{CLZ} on ARM64), eliminating software loop overhead.
-    \item \textbf{Concurrency Without GIL Penalties:} Read-write synchronization utilizes \texttt{std::shared\_mutex}, allowing concurrent query reads via shared reader locks without contending with streaming update writers. This eliminates the Global Interpreter Lock (GIL) bottlenecks present in CPython.
+ \item \textbf{Hardware-Optimized xxHash (XXH64):} The C++ worker replaces general-purpose hashing with \texttt{XXH64}, an ultra-fast non-cryptographic hash algorithm executing at near-RAM memory bus speeds ($>13\text{ GB/s}$), providing a $\sim 10\times$ throughput improvement over standard MD5/SHA algorithms.
+ \item \textbf{Single-Cycle Bit Manipulation Intrinsics:} In the HyperLogLog register update path, leading-zero counting is implemented using C++20's \texttt{std::countl\_zero()}, which the compiler translates directly into hardware-accelerated CPU instructions (\texttt{LZCNT} on x86-64 or \texttt{CLZ} on ARM64), eliminating software loop overhead.
+ \item \textbf{Concurrency Without GIL Penalties:} Read-write synchronization utilizes \texttt{std::shared\_mutex}, allowing concurrent query reads via shared reader locks without contending with streaming update writers. This eliminates the Global Interpreter Lock (GIL) bottlenecks present in CPython.
 \end{itemize}
 
 \section{Federated Telemetry and State Management}
@@ -101,24 +101,24 @@ To address this, we developed a multi-criteria \textbf{Utility Scoring Router}. 
 \end{equation}
 where:
 \begin{itemize}
-    \item $\mathcal{N}_{\text{lat}}(\text{P99}_i) = \max\left(0.0, 1.0 - \frac{\text{P99}_i}{\text{SLA}_{\text{lat}}}\right)$ evaluates normalized latency headroom against the operational SLA limit ($\text{SLA}_{\text{lat}} = 20.0\text{ ms}$).
-    \item $U_{\text{mem}, i} \in [0, 1]$ represents the fraction of host memory currently utilized.
-    \item $\hat{\epsilon}_i$ represents the empirical Weighted Absolute Percentage Error (WAPE) of the worker's Count-Min Sketch.
-    \item $w_{\text{lat}}, w_{\text{mem}}, w_{\text{err}} \ge 0$ are weighting coefficients satisfying $w_{\text{lat}} + w_{\text{mem}} + w_{\text{err}} = 1.0$ (configured by default to $0.4, 0.3, 0.3$).
+ \item $\mathcal{N}_{\text{lat}}(\text{P99}_i) = \max\left(0.0, 1.0 - \frac{\text{P99}_i}{\text{SLA}_{\text{lat}}}\right)$ evaluates normalized latency headroom against the operational SLA limit ($\text{SLA}_{\text{lat}} = 20.0\text{ ms}$).
+ \item $U_{\text{mem}, i} \in [0, 1]$ represents the fraction of host memory currently utilized.
+ \item $\hat{\epsilon}_i$ represents the empirical Weighted Absolute Percentage Error (WAPE) of the worker's Count-Min Sketch.
+ \item $w_{\text{lat}}, w_{\text{mem}}, w_{\text{err}} \ge 0$ are weighting coefficients satisfying $w_{\text{lat}} + w_{\text{mem}} + w_{\text{err}} = 1.0$ (configured by default to $0.4, 0.3, 0.3$).
 \end{itemize}
 
 \subsection{Routing Policies}
 The router supports two operational selection regimes:
 \begin{enumerate}
-    \item \textbf{Deterministic Greedy Routing:} The router dispatches the incoming query to the worker exhibiting the highest instantaneous utility score:
-    \begin{equation}
+ \item \textbf{Deterministic Greedy Routing:} The router dispatches the incoming query to the worker exhibiting the highest instantaneous utility score:
+ \begin{equation}
         i^* = \arg\max_{i \in \mathcal{W}_{\text{active}}} S_i(t)
     \end{equation}
-    \item \textbf{Boltzmann Softmax Routing:} To prevent herd behavior and distribute load across healthy replicas, queries can be routed probabilistically according to a Gibbs distribution:
-    \begin{equation}
+ \item \textbf{Boltzmann Softmax Routing:} To prevent herd behavior and distribute load across healthy replicas, queries can be routed probabilistically according to a Gibbs distribution:
+ \begin{equation}
         P(\text{Route to Worker } i) = \frac{\exp(S_i(t) / \tau)}{\sum_{j \in \mathcal{W}_{\text{active}}} \exp(S_j(t) / \tau)}
     \end{equation}
-    where $\tau > 0$ denotes a temperature parameter governing exploration spread.
+ where $\tau > 0$ denotes a temperature parameter governing exploration spread.
 \end{enumerate}
 
 \section{Online Machine Learning Controller}
@@ -129,69 +129,69 @@ Fixed heuristic controllers relying on static thresholds suffer from policy flap
 We model the adaptive control plane as a discrete-time Markov Decision Process defined by the tuple $\langle \mathcal{S}, \mathcal{A}, \mathcal{P}, \mathcal{R}, \gamma \rangle$:
 
 \begin{itemize}
-    \item \textbf{State Space $\mathcal{S}$ ($|\mathcal{S}| = 108$):} Each worker's operating state $s_t \in \mathcal{S}$ is characterized by four discrete dimensions:
-    \begin{equation}
+ \item \textbf{State Space $\mathcal{S}$ ($|\mathcal{S}| = 108$):} Each worker's operating state $s_t \in \mathcal{S}$ is characterized by four discrete dimensions:
+ \begin{equation}
         s_t = \langle L_t, M_t, E_t, T_t \rangle
     \end{equation}
-    where:
-    \begin{enumerate}
-        \item \textbf{Latency Bin $L_t \in \{0, 1, 2, 3\}$:} Captures worker update latency with a proactive warning threshold:
-        \begin{itemize}
-            \item $0$ (Normal): $\text{P99} < 10.0\text{ ms}$
-            \item $1$ (Elevated): $10.0\text{ ms} \le \text{P99} < 14.0\text{ ms}$
-            \item $2$ (Proactive Approaching-SLA): $14.0\text{ ms} \le \text{P99} < 20.0\text{ ms}$ (representing $70\%\text{--}100\%$ of SLA)
-            \item $3$ (SLA Violated): $\text{P99} \ge 20.0\text{ ms}$
-        \end{itemize}
-        \item \textbf{Memory Bin $M_t \in \{0, 1, 2\}$:}
-        \begin{itemize}
-            \item $0$ (Low): Memory usage $< 60\%$
-            \item $1$ (Moderate): $60\% \le \text{Memory} < 80\%$
-            \item $2$ (High/Critical): $\text{Memory} \ge 80\%$
-        \end{itemize}
-        \item \textbf{Empirical Error Bin $E_t \in \{0, 1, 2\}$:}
-        \begin{itemize}
-            \item $0$ (Low Error): $\hat{\epsilon}_{\text{WAPE}} < 1.0\%$
-            \item $1$ (Moderate Error): $1.0\% \le \hat{\epsilon}_{\text{WAPE}} < 3.0\%$
-            \item $2$ (High Error): $\hat{\epsilon}_{\text{WAPE}} \ge 3.0\%$
-        \end{itemize}
-        \item \textbf{Active Template Bin $T_t \in \{0, 1, 2\}$:} Represents the worker's current sketch configuration template ($\text{Low} = 0$, $\text{Medium} = 1$, $\text{High} = 2$).
-    \end{enumerate}
-    The total number of unique states is given by:
-    \begin{equation}
+ where:
+ \begin{enumerate}
+ \item \textbf{Latency Bin $L_t \in \{0, 1, 2, 3\}$:} Captures worker update latency with a proactive warning threshold:
+ \begin{itemize}
+ \item $0$ (Normal): $\text{P99} < 10.0\text{ ms}$
+ \item $1$ (Elevated): $10.0\text{ ms} \le \text{P99} < 14.0\text{ ms}$
+ \item $2$ (Proactive Approaching-SLA): $14.0\text{ ms} \le \text{P99} < 20.0\text{ ms}$ (representing $70\%\text{--}100\%$ of SLA)
+ \item $3$ (SLA Violated): $\text{P99} \ge 20.0\text{ ms}$
+ \end{itemize}
+ \item \textbf{Memory Bin $M_t \in \{0, 1, 2\}$:}
+ \begin{itemize}
+ \item $0$ (Low): Memory usage $< 60\%$
+ \item $1$ (Moderate): $60\% \le \text{Memory} < 80\%$
+ \item $2$ (High/Critical): $\text{Memory} \ge 80\%$
+ \end{itemize}
+ \item \textbf{Empirical Error Bin $E_t \in \{0, 1, 2\}$:}
+ \begin{itemize}
+ \item $0$ (Low Error): $\hat{\epsilon}_{\text{WAPE}} < 1.0\%$
+ \item $1$ (Moderate Error): $1.0\% \le \hat{\epsilon}_{\text{WAPE}} < 3.0\%$
+ \item $2$ (High Error): $\hat{\epsilon}_{\text{WAPE}} \ge 3.0\%$
+ \end{itemize}
+ \item \textbf{Active Template Bin $T_t \in \{0, 1, 2\}$:} Represents the worker's current sketch configuration template ($\text{Low} = 0$, $\text{Medium} = 1$, $\text{High} = 2$).
+ \end{enumerate}
+ The total number of unique states is given by:
+ \begin{equation}
         |\mathcal{S}| = |L| \times |M| \times |E| \times |T| = 4 \times 3 \times 3 \times 3 = 108 \text{ states}
     \end{equation}
 
-    \item \textbf{Action Space $\mathcal{A}$ ($|\mathcal{A}| = 3$):} The action represents the target sketch template directly:
-    \begin{equation}
+ \item \textbf{Action Space $\mathcal{A}$ ($|\mathcal{A}| = 3$):} The action represents the target sketch template directly:
+ \begin{equation}
         \mathcal{A} = \{\text{Low}, \text{Medium}, \text{High}\}
     \end{equation}
-    Direct action assignment enables single-step jump capability. Under severe latency or memory spikes, the controller can transition directly from $\text{High}$ to $\text{Low}$ in a single decision cycle rather than stepping through intermediate states.
+ Direct action assignment enables single-step jump capability. Under severe latency or memory spikes, the controller can transition directly from $\text{High}$ to $\text{Low}$ in a single decision cycle rather than stepping through intermediate states.
 
-    \item \textbf{Reward Function $\mathcal{R}$:} The composite reward function $R_t \in [-1, 1]$ balances multiple competing objectives:
-    \begin{equation}
+ \item \textbf{Reward Function $\mathcal{R}$:} The composite reward function $R_t \in [-1, 1]$ balances multiple competing objectives:
+ \begin{equation}
         R_t = 1.0 - \left(w_e \cdot C_{\text{err}} + w_l \cdot C_{\text{lat}} + w_m \cdot C_{\text{mem}} + w_s \cdot \mathbb{I}[a_t \ne T_t]\right) + B_{\text{prec}}
         \label{eq:rl_reward}
     \end{equation}
-    where:
-    \begin{itemize}
-        \item $C_{\text{err}} = \min(1.0, 10.0 \cdot \hat{\epsilon}_{\text{WAPE}})$ penalizes empirical estimation error.
-        \item $C_{\text{lat}}$ implements a nonlinear hinge penalty for latency violations:
-        \begin{equation}
+ where:
+ \begin{itemize}
+ \item $C_{\text{err}} = \min(1.0, 10.0 \cdot \hat{\epsilon}_{\text{WAPE}})$ penalizes empirical estimation error.
+ \item $C_{\text{lat}}$ implements a nonlinear hinge penalty for latency violations:
+ \begin{equation}
             C_{\text{lat}} = \begin{cases}
                 \frac{\text{P99}}{20.0} & \text{if } \text{P99} \le 20.0\text{ ms} \\
                 1.0 + 2.0 \cdot \left(\frac{\text{P99} - 20.0}{20.0}\right) & \text{if } \text{P99} > 20.0\text{ ms}
             \end{cases}
         \end{equation}
-        \item $C_{\text{mem}}$ penalizes memory pressure, ramping up sharply above $80\%$:
-        \begin{equation}
+ \item $C_{\text{mem}}$ penalizes memory pressure, ramping up sharply above $80\%$:
+ \begin{equation}
             C_{\text{mem}} = \begin{cases}
                 \frac{U_{\text{mem}}}{0.80} & \text{if } U_{\text{mem}} \le 0.80 \\
                 1.0 + 3.0 \cdot (U_{\text{mem}} - 0.80) & \text{if } U_{\text{mem}} > 0.80
             \end{cases}
         \end{equation}
-        \item $w_s \cdot \mathbb{I}[a_t \ne T_t]$ represents an anti-flapping switching penalty ($w_s = 0.15$), penalizing unnecessary template transitions.
-        \item $B_{\text{prec}} \in \{0.0, 0.05, 0.10\}$ provides a small positive bonus for sustaining higher precision templates when resource headroom permits.
-    \end{itemize}
+ \item $w_s \cdot \mathbb{I}[a_t \ne T_t]$ represents an anti-flapping switching penalty ($w_s = 0.15$), penalizing unnecessary template transitions.
+ \item $B_{\text{prec}} \in \{0.0, 0.05, 0.10\}$ provides a small positive bonus for sustaining higher precision templates when resource headroom permits.
+ \end{itemize}
 \end{itemize}
 
 \subsection{Temporal Difference Q-Learning Formulation}
@@ -239,9 +239,9 @@ Let $\mathcal{K}_t$ and $\mathcal{K}_{t-1}$ represent the sets of heavy-hitter k
 \end{equation}
 A drift alert is triggered whenever $D_{\text{TV}}(P_t, P_{t-1}) > \tau_{\text{drift}}$ (default $\tau_{\text{drift}} = 0.15$). When drift is detected:
 \begin{enumerate}
-    \item The telemetry blackboard registers an active concept drift event.
-    \item The Q-Learning agent temporarily boosts its exploration parameter $\epsilon \leftarrow \max(\epsilon, 0.30)$, accelerating policy re-adaptation to the newly emerged heavy-hitter distribution.
-    \item Telemetry logs record the exact shift magnitude for post-mortem auditing.
+ \item The telemetry blackboard registers an active concept drift event.
+ \item The Q-Learning agent temporarily boosts its exploration parameter $\epsilon \leftarrow \max(\epsilon, 0.30)$, accelerating policy re-adaptation to the newly emerged heavy-hitter distribution.
+ \item Telemetry logs record the exact shift magnitude for post-mortem auditing.
 \end{enumerate}
 
 \section{Zero-Data-Loss Dynamic Sketch Resizing Algebra}
@@ -297,23 +297,23 @@ Probabilistic summary structures form algebraic \textbf{Monoids} $(\mathcal{S}, 
 Because disjoint partitions process independent subsets of the global stream, global queries do not require raw event transmission. Instead, workers transmit compact partial sketch matrices ($\sim 50\text{--}100\text{ KB}$), which the query coordinator merges in $<500\ \mu\text{s}$:
 
 \begin{enumerate}
-    \item \textbf{Count-Min Sketch (Element-Wise Addition):}
-    Let $\mathbf{C}_p \in \mathbb{N}^{d \times w}$ be the count matrix on partition $p \in \{0, \dots, P-1\}$. The cluster-wide merged sketch is computed as:
-    \begin{equation}
+ \item \textbf{Count-Min Sketch (Element-Wise Addition):}
+ Let $\mathbf{C}_p \in \mathbb{N}^{d \times w}$ be the count matrix on partition $p \in \{0, \dots, P-1\}$. The cluster-wide merged sketch is computed as:
+ \begin{equation}
         \mathbf{C}_{\text{global}}[i, j] = \sum_{p=0}^{P-1} \mathbf{C}_p[i, j] \quad \forall i \in [d], j \in [w]
     \end{equation}
-    Because matrix addition over $\mathbb{N}$ is associative and commutative, CMS forms an Abelian Monoid. The global point estimate satisfies $\hat{f}(x) \le f_{\text{global}}(x) + \frac{e}{w} \sum_p N_p$.
+ Because matrix addition over $\mathbb{N}$ is associative and commutative, CMS forms an Abelian Monoid. The global point estimate satisfies $\hat{f}(x) \le f_{\text{global}}(x) + \frac{e}{w} \sum_p N_p$.
 
-    \item \textbf{HyperLogLog (Coordinate-Wise Join Semilattice):}
-    Let $\mathbf{R}_p \in \mathbb{N}^m$ be the register array of partition $p$. The merged cluster register array is:
-    \begin{equation}
+ \item \textbf{HyperLogLog (Coordinate-Wise Join Semilattice):}
+ Let $\mathbf{R}_p \in \mathbb{N}^m$ be the register array of partition $p$. The merged cluster register array is:
+ \begin{equation}
         \mathbf{R}_{\text{global}}[i] = \max_{p \in \{0, \dots, P-1\}} \mathbf{R}_p[i] \quad \forall i \in \{0, \dots, m-1\}
     \end{equation}
-    Because $\max(a, b)$ is associative, commutative, and idempotent ($\max(a, a) = a$), HyperLogLog forms a bounded join-semilattice. Even under duplicate event delivery across partitions, register max-folding preserves exact deduplicated union cardinality.
+ Because $\max(a, b)$ is associative, commutative, and idempotent ($\max(a, a) = a$), HyperLogLog forms a bounded join-semilattice. Even under duplicate event delivery across partitions, register max-folding preserves exact deduplicated union cardinality.
 
-    \item \textbf{Misra--Gries (Space-Saving Monoid Merge):}
-    Following Agarwal et al.~\cite{agarwal2013mergeable}, candidate heavy-hitter frequencies from all partitions are combined: $f_{\text{merged}}(x) = \sum_p f_p(x)$. If the number of unique candidate keys exceeds capacity $k = \min_p k_p$, the $k^{\text{th}}$ largest count $C_{\min}$ is subtracted from all candidate counts, retaining only items with positive remainder. The merged summary guarantees bounded additive error:
-    \begin{equation}
+ \item \textbf{Misra--Gries (Space-Saving Monoid Merge):}
+ Following Agarwal et al.~\cite{agarwal2013mergeable}, candidate heavy-hitter frequencies from all partitions are combined: $f_{\text{merged}}(x) = \sum_p f_p(x)$. If the number of unique candidate keys exceeds capacity $k = \min_p k_p$, the $k^{\text{th}}$ largest count $C_{\min}$ is subtracted from all candidate counts, retaining only items with positive remainder. The merged summary guarantees bounded additive error:
+ \begin{equation}
         \text{Error Bound} \le \frac{\sum_p N_p}{\min_p k_p}
     \end{equation}
 \end{enumerate}
@@ -331,10 +331,10 @@ For $P = 4$ partitions, $18.55\%$ of all queries stall. For $P = 16$ partitions,
 
 To eliminate straggler stalls, the scatter-gather engine implements **Hedged Requests**~\cite{dean2013tail}:
 \begin{enumerate}
-    \item \textbf{Primary Request Dispatch:} The engine asynchronously transmits sub-queries to primary partition workers $W_{p, \text{primary}}$.
-    \item \textbf{Hedge Delay Timer:} A timer is initialized to $T_{\text{hedge}}$, configured to the empirical 95th percentile latency of normal worker responses ($T_{\text{hedge}} = 4.5\text{ ms}$).
-    \item \textbf{Duplicate Hedged Dispatch:} If $W_{p, \text{primary}}$ fails to respond within $T_{\text{hedge}}$, a duplicate request is immediately dispatched to hot-standby replica $W_{p, \text{replica}}$.
-    \item \textbf{First-Completion Acceptance:} The engine accepts the first response to complete from either node, cancelling the outstanding task on the lagging worker.
+ \item \textbf{Primary Request Dispatch:} The engine asynchronously transmits sub-queries to primary partition workers $W_{p, \text{primary}}$.
+ \item \textbf{Hedge Delay Timer:} A timer is initialized to $T_{\text{hedge}}$, configured to the empirical 95th percentile latency of normal worker responses ($T_{\text{hedge}} = 4.5\text{ ms}$).
+ \item \textbf{Duplicate Hedged Dispatch:} If $W_{p, \text{primary}}$ fails to respond within $T_{\text{hedge}}$, a duplicate request is immediately dispatched to hot-standby replica $W_{p, \text{replica}}$.
+ \item \textbf{First-Completion Acceptance:} The engine accepts the first response to complete from either node, cancelling the outstanding task on the lagging worker.
 \end{enumerate}
 The effective latency for partition $p$ is bounded by:
 \begin{equation}

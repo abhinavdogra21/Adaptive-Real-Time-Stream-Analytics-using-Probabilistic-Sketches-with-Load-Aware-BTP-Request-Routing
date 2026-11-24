@@ -2,9 +2,9 @@
 
 In the classic streaming model of computation formulated by Alon, Matias, and Szegedy~\cite{alon1996space} and synthesized by Muthukrishnan~\cite{muthukrishnan2005data}, an input sequence $\mathcal{S} = \langle a_1, a_2, \dots, a_N \rangle$ of items from a large universe $\mathcal{U} = \{1, 2, \dots, U\}$ arrives sequentially at high velocity. The stream must be processed subject to three severe constraints:
 \begin{enumerate}
-    \item \textbf{Single-Pass Processing:} Each item $a_t$ can be examined only once in arrival order; elements cannot be stored on disk for subsequent re-examination.
-    \item \textbf{Sub-linear Working Memory:} The memory footprint $M$ of the algorithm must satisfy $M \ll N$ and $M \ll U$, typically scaling as $O(\text{poly}(\log N, \log U, 1/\epsilon))$.
-    \item \textbf{Constant Update Time:} The per-item processing time must be $O(1)$ worst-case or amortized to sustain line-rate ingestion without causing buffer overflow.
+ \item \textbf{Single-Pass Processing:} Each item $a_t$ can be examined only once in arrival order; elements cannot be stored on disk for subsequent re-examination.
+ \item \textbf{Sub-linear Working Memory:} The memory footprint $M$ of the algorithm must satisfy $M \ll N$ and $M \ll U$, typically scaling as $O(\text{poly}(\log N, \log U, 1/\epsilon))$.
+ \item \textbf{Constant Update Time:} The per-item processing time must be $O(1)$ worst-case or amortized to sustain line-rate ingestion without causing buffer overflow.
 \end{enumerate}
 
 Early foundational work by Morris~\cite{morris1978counting} showed that an approximate counter could track an integer up to $N$ using only $O(\log \log N)$ bits by incrementing probabilistically with probability $2^{-v}$, where $v$ is the register value. Modern streaming systems build upon this probabilistic foundation to estimate frequency, cardinality, and quantiles with provable accuracy guarantees.
@@ -88,11 +88,11 @@ The HyperLogLog algorithm, developed by Flajolet et al.~\cite{hll} as an evoluti
 
 For each arriving element $x$:
 \begin{enumerate}
-    \item Compute a 64-bit non-cryptographic hash digest $h(x) \in \{0, 1\}^{64}$.
-    \item Partition the hash into two bit-slices: the leading $p$ bits determine the register index $j \in \{0, 1, \dots, m-1\}$, and the remaining $64 - p$ bits form the bitstring $w$.
-    \item Compute $\rho(w)$, defined as the position of the leftmost 1-bit in $w$ (with $\rho(00\dots) = 64 - p + 1$).
-    \item Update the register via the idempotent maximum operator:
-    \begin{equation}
+ \item Compute a 64-bit non-cryptographic hash digest $h(x) \in \{0, 1\}^{64}$.
+ \item Partition the hash into two bit-slices: the leading $p$ bits determine the register index $j \in \{0, 1, \dots, m-1\}$, and the remaining $64 - p$ bits form the bitstring $w$.
+ \item Compute $\rho(w)$, defined as the position of the leftmost 1-bit in $w$ (with $\rho(00\dots) = 64 - p + 1$).
+ \item Update the register via the idempotent maximum operator:
+ \begin{equation}
         \mathbf{R}[j] \leftarrow \max\left( \mathbf{R}[j],\; \rho(w) \right)
     \end{equation}
 \end{enumerate}
@@ -141,12 +141,12 @@ Tracking the most frequent elements (heavy hitters or ``elephants'') in real tim
 \subsection{Misra--Gries Counter Maintenance}
 The Misra--Gries algorithm maintains a dynamic map $\mathcal{M}$ containing at most $k-1$ candidate items and associated counters:
 \begin{enumerate}
-    \item When element $x$ arrives:
-    \begin{itemize}
-        \item If $x \in \mathcal{M}$, increment its counter: $\mathcal{M}[x] \leftarrow \mathcal{M}[x] + 1$.
-        \item Else if $|\mathcal{M}| < k - 1$, insert $x$ with initial count: $\mathcal{M}[x] \leftarrow 1$.
-        \item Else (all $k-1$ slots occupied), decrement all existing counters in $\mathcal{M}$ by 1, and evict any entries whose counter falls to 0.
-    \end{itemize}
+ \item When element $x$ arrives:
+ \begin{itemize}
+ \item If $x \in \mathcal{M}$, increment its counter: $\mathcal{M}[x] \leftarrow \mathcal{M}[x] + 1$.
+ \item Else if $|\mathcal{M}| < k - 1$, insert $x$ with initial count: $\mathcal{M}[x] \leftarrow 1$.
+ \item Else (all $k-1$ slots occupied), decrement all existing counters in $\mathcal{M}$ by 1, and evict any entries whose counter falls to 0.
+ \end{itemize}
 \end{enumerate}
 
 \subsection{Error Guarantees}
@@ -181,19 +181,19 @@ A central theoretical pillar of this work is the application of abstract algebra
 \subsection{Algebraic Properties}
 Formally, a sketch family $\mathcal{S}$ forms an algebraic \textbf{Monoid} $(\mathcal{S}, \oplus, \mathbf{0})$ under a binary merge operator $\oplus$ if it satisfies:
 \begin{enumerate}
-    \item \textbf{Closure:} $\forall A, B \in \mathcal{S} \implies (A \oplus B) \in \mathcal{S}$.
-    \item \textbf{Associativity:} $(A \oplus B) \oplus C = A \oplus (B \oplus C) \quad \forall A, B, C \in \mathcal{S}$.
-    \item \textbf{Identity Element:} $\exists \mathbf{0} \in \mathcal{S}$ such that $A \oplus \mathbf{0} = \mathbf{0} \oplus A = A \quad \forall A \in \mathcal{S}$.
+ \item \textbf{Closure:} $\forall A, B \in \mathcal{S} \implies (A \oplus B) \in \mathcal{S}$.
+ \item \textbf{Associativity:} $(A \oplus B) \oplus C = A \oplus (B \oplus C) \quad \forall A, B, C \in \mathcal{S}$.
+ \item \textbf{Identity Element:} $\exists \mathbf{0} \in \mathcal{S}$ such that $A \oplus \mathbf{0} = \mathbf{0} \oplus A = A \quad \forall A \in \mathcal{S}$.
 \end{enumerate}
 
-Furthermore, if the merge operator is \textbf{commutative} ($A \oplus B = B \oplus A$), the summary is an Abelian Monoid. If it is \textbf{idempotent} ($A \oplus A = A$), the summary forms a bounded \textbf{join-semilattice}.
+In addition, if the merge operator is \textbf{commutative} ($A \oplus B = B \oplus A$), the summary is an Abelian Monoid. If it is \textbf{idempotent} ($A \oplus A = A$), the summary forms a bounded \textbf{join-semilattice}.
 
 \subsection{Significance for Distributed Stream Processing}
 In distributed stream architectures, Monoid properties eliminate the need for centralized coordinators or distributed write locks:
 \begin{itemize}
-    \item \textbf{Arbitrary Partition Order:} Associativity and commutativity guarantee that partial sketches can be gathered from worker nodes in arbitrary network arrival order without corrupting the merged state.
-    \item \textbf{Lock-Free Ingestion:} Because workers maintain independent local Monoid states, ingestion occurs at raw memory speed without inter-node synchronization.
-    \item \textbf{Fault-Tolerant Duplicate Safety:} Under HyperLogLog's idempotent join-semilattice ($\max(R_1, R_1) = R_1$), network retransmissions and speculative duplicate requests do not bias cardinality estimates.
+ \item \textbf{Arbitrary Partition Order:} Associativity and commutativity guarantee that partial sketches can be gathered from worker nodes in arbitrary network arrival order without corrupting the merged state.
+ \item \textbf{Lock-Free Ingestion:} Because workers maintain independent local Monoid states, ingestion occurs at raw memory speed without inter-node synchronization.
+ \item \textbf{Fault-Tolerant Duplicate Safety:} Under HyperLogLog's idempotent join-semilattice ($\max(R_1, R_1) = R_1$), network retransmissions and speculative duplicate requests do not bias cardinality estimates.
 \end{itemize}
 
 \section{Reinforcement Learning and Multi-Armed Bandits for Systems}
@@ -203,11 +203,11 @@ Autonomous parameter adaptation in computer systems has evolved from heuristic r
 \subsection{Markov Decision Process (MDP) Formulation}
 A sequential control problem in a dynamic environment is formalized as a Markov Decision Process defined by the 5-tuple $(\mathcal{S}, \mathcal{A}, \mathcal{P}, \mathcal{R}, \gamma)$:
 \begin{itemize}
-    \item $\mathcal{S}$ is the set of system states.
-    \item $\mathcal{A}$ is the discrete action space.
-    \item $\mathcal{P}(s' \mid s, a) = \Pr[S_{t+1} = s' \mid S_t = s, A_t = a]$ is the state transition probability.
-    \item $\mathcal{R}(s, a, s')$ is the scalar reward signal returned upon taking action $a$ in state $s$.
-    \item $\gamma \in [0, 1)$ is the discount factor for future rewards.
+ \item $\mathcal{S}$ is the set of system states.
+ \item $\mathcal{A}$ is the discrete action space.
+ \item $\mathcal{P}(s' \mid s, a) = \Pr[S_{t+1} = s' \mid S_t = s, A_t = a]$ is the state transition probability.
+ \item $\mathcal{R}(s, a, s')$ is the scalar reward signal returned upon taking action $a$ in state $s$.
+ \item $\gamma \in [0, 1)$ is the discount factor for future rewards.
 \end{itemize}
 
 The goal of the agent is to find an optimal policy $\pi^* : \mathcal{S} \rightarrow \mathcal{A}$ maximizing expected cumulative discounted return:

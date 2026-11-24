@@ -29,10 +29,10 @@ Underlying data services (Kafka brokers, ZooKeeper quorum, Redis instance) are c
 To provide live visibility into cluster operations, sketch health, and controller actuation, we developed a responsive single-page dashboard. The frontend polls the FastAPI \texttt{/metrics/cluster} and \texttt{/metrics/controller-stats} endpoints every 2 seconds, rendering real-time metrics with Chart.js.
 
 \begin{figure}[htbp]
-    \centering
-    \includegraphics[width=0.95\textwidth]{Figures/dashboard_screenshot.png}
-    \caption{Interactive operational dashboard showing the cluster telemetry and control plane. Visual panels display active controller modes (Q-Learning 108 MDP with Hedging), worker P99 response times against the 20~ms SLA threshold, per-worker CPU and memory utilization, live sketch estimates (HyperLogLog cardinality, Misra--Gries heavy hitters, Count-Min frequency), and real-time query exploration tools.}
-    \label{fig:dashboard_screenshot}
+ \centering
+ \includegraphics[width=0.95\textwidth]{Figures/dashboard_screenshot.png}
+ \caption{Interactive operational dashboard showing the cluster telemetry and control plane. Visual panels display active controller modes (Q-Learning 108 MDP with Hedging), worker P99 response times against the 20~ms SLA threshold, per-worker CPU and memory utilization, live sketch estimates (HyperLogLog cardinality, Misra--Gries heavy hitters, Count-Min frequency), and real-time query exploration tools.}
+ \label{fig:dashboard_screenshot}
 \end{figure}
 
 As shown in Figure~\ref{fig:dashboard_screenshot}, the interface organizes system metrics into six functional modules:
@@ -40,9 +40,9 @@ As shown in Figure~\ref{fig:dashboard_screenshot}, the interface organizes syste
 \subsection{Cluster Telemetry and Control Header}
 The top navigation bar displays cluster-wide status badges:
 \begin{itemize}
-    \item \textbf{Active Control Policy:} Indicates whether the cluster is governed by the 108-State Q-Learning agent, the LinUCB contextual bandit, or rule-based heuristics.
-    \item \textbf{Hedged Scatter-Gather Status:} Confirms that hedged request dispatching is active with a configured threshold of $\Delta = 4.5\text{ ms}$.
-    \item \textbf{Live Traffic Toggle and Refresh Controls:} Enables automated synthetic traffic injection directly from the browser interface.
+ \item \textbf{Active Control Policy:} Indicates whether the cluster is governed by the 108-State Q-Learning agent, the LinUCB contextual bandit, or rule-based heuristics.
+ \item \textbf{Hedged Scatter-Gather Status:} Confirms that hedged request dispatching is active with a configured threshold of $\Delta = 4.5\text{ ms}$.
+ \item \textbf{Live Traffic Toggle and Refresh Controls:} Enables automated synthetic traffic injection directly from the browser interface.
 \end{itemize}
 
 \subsection{P99 Latency vs. SLA Monitor}
@@ -54,9 +54,9 @@ Grouped bar charts track instantaneous CPU utilization and physical memory consu
 \subsection{Live Sketch Aggregate Summaries}
 Three primary telemetry cards display live estimates computed across the ingestion stream:
 \begin{itemize}
-    \item \textbf{Unique Key Cardinality (HyperLogLog):} Displays the estimated distinct item count along with its theoretical standard error bound ($\pm 1.625\%$ for $p=12$).
-    \item \textbf{Top Heavy Hitters (Misra--Gries):} Ranks the current sliding window's most frequent keys, accompanied by relative percentage shares.
-    \item \textbf{Point Item Frequency (Count-Min Sketch):} Displays real-time frequency estimates and conservative error upper bounds.
+ \item \textbf{Unique Key Cardinality (HyperLogLog):} Displays the estimated distinct item count along with its theoretical standard error bound ($\pm 1.625\%$ for $p=12$).
+ \item \textbf{Top Heavy Hitters (Misra--Gries):} Ranks the current sliding window's most frequent keys, accompanied by relative percentage shares.
+ \item \textbf{Point Item Frequency (Count-Min Sketch):} Displays real-time frequency estimates and conservative error upper bounds.
 \end{itemize}
 
 \subsection{Dynamic Query Explorer}
