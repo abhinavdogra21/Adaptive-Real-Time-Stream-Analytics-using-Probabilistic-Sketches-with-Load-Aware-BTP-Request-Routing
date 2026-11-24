@@ -1,121 +1,265 @@
-\section{Background on Approximate Counting}
+\section{Foundations of the Streaming Model}
 
-The field of streaming algorithms focuses on processing sequences of items efficiently under extreme memory constraints. For many network monitoring and metric aggregation problems, probabilistic estimations offer a vastly superior operational advantage over exact counts. In a production environment, a database query taking 5 seconds to provide exact numbers has far less utility than a sketch-based metric arriving in 5 milliseconds with a guaranteed 1\% margin of error. The foundational work by Morris~\cite{morris1978counting} demonstrated that approximate counting with logarithmic space is feasible, laying the groundwork for the modern sketch-based algorithms discussed in this chapter.
+In the classic streaming model of computation formulated by Alon, Matias, and Szegedy~\cite{alon1996space} and synthesized by Muthukrishnan~\cite{muthukrishnan2005data}, an input sequence $\mathcal{S} = \langle a_1, a_2, \dots, a_N \rangle$ of items from a large universe $\mathcal{U} = \{1, 2, \dots, U\}$ arrives sequentially at high velocity. The stream must be processed subject to three severe constraints:
+\begin{enumerate}
+    \item \textbf{Single-Pass Processing:} Each item $a_t$ can be examined only once in arrival order; elements cannot be stored on disk for subsequent re-examination.
+    \item \textbf{Sub-linear Working Memory:} The memory footprint $M$ of the algorithm must satisfy $M \ll N$ and $M \ll U$, typically scaling as $O(\text{poly}(\log N, \log U, 1/\epsilon))$.
+    \item \textbf{Constant Update Time:} The per-item processing time must be $O(1)$ worst-case or amortized to sustain line-rate ingestion without causing buffer overflow.
+\end{enumerate}
 
-\section{Count-Min Sketch (CMS)}
+Early foundational work by Morris~\cite{morris1978counting} showed that an approximate counter could track an integer up to $N$ using only $O(\log \log N)$ bits by incrementing probabilistically with probability $2^{-v}$, where $v$ is the register value. Modern streaming systems build upon this probabilistic foundation to estimate frequency, cardinality, and quantiles with provable accuracy guarantees.
 
-The Count-Min Sketch, introduced by Cormode and Muthukrishnan~\cite{cms}, is a compact data structure that serves a randomized frequency table. It answers the point query: \textit{``How many times has item $x$ appeared in the stream?''}
+\section{Count-Min Sketch (CMS) and Advanced Variants}
 
-\subsection{Data Structure}
-Structurally, the CMS is a two-dimensional array of integer counters with $d$ rows and $w$ columns. Each row is associated with an independent pairwise hash function $h_i : \mathcal{U} \rightarrow \{0, 1, \ldots, w-1\}$ for $i = 1, 2, \ldots, d$.
+The Count-Min Sketch, introduced by Cormode and Muthukrishnan~\cite{cms}, is an established linear summary for answering point queries over data streams with non-negative updates.
 
-\subsection{Update Operation}
-When an element $x$ arrives in the stream, for each hash function $h_i$, the counter at position $(i, h_i(x))$ is incremented by 1. The update cost is $O(d)$ hash computations and increments.
-
-\subsection{Query Operation}
-To estimate the frequency $\hat{f}(x)$ of an element $x$, we compute:
+\subsection{Standard Structure and Operation}
+The Count-Min Sketch consists of a two-dimensional array of counters $\mathbf{C} \in \mathbb{N}^{d \times w}$, parameterized by depth $d$ and width $w$. The sketch employs $d$ pairwise independent hash functions:
 \begin{equation}
-    \hat{f}(x) = \min_{1 \le i \le d} \; \text{table}[i][h_i(x)]
+    h_i : \mathcal{U} \rightarrow \{0, 1, \dots, w - 1\}, \quad i \in \{1, 2, \dots, d\}
 \end{equation}
 
-\subsection{Error Guarantees}
-By dimensioning the sketch with $w = \lceil e/\epsilon \rceil$ columns and $d = \lceil \ln(1/\delta) \rceil$ rows, the CMS guarantees:
+\paragraph{Update Procedure:} Upon observing an element $x \in \mathcal{U}$ with weight $c > 0$, the sketch increments one counter in every row:
 \begin{equation}
-    f(x) \le \hat{f}(x) \le f(x) + \epsilon N \quad \text{with probability at least } 1-\delta
+    \mathbf{C}[i, h_i(x)] \leftarrow \mathbf{C}[i, h_i(x)] + c \quad \forall i \in \{1, \dots, d\}
 \end{equation}
-where $N$ is the total number of events processed. The memory consumed is strictly bounded to $O(w \cdot d)$ integer counters.
 
-\subsection{Parameter Templates Used}
-In our implementation, we define three precision templates to allow runtime trade-offs:
+\paragraph{Query Procedure:} To estimate the total frequency $\hat{f}(x)$ of key $x$, the sketch reads the counters mapped by $x$ across all rows and takes their minimum:
+\begin{equation}
+    \hat{f}(x) = \min_{1 \le i \le d} \mathbf{C}[i, h_i(x)]
+\end{equation}
+
+\subsection{Theoretical Error Guarantees}
+Because hash collisions can only increase counter values (never decrease them), the sketch guarantees that it never undercounts:
+\begin{equation}
+    \hat{f}(x) \ge f(x)
+\end{equation}
+By setting the sketch dimensions as:
+\begin{equation}
+    w = \left\lceil \frac{e}{\epsilon} \right\rceil, \qquad d = \left\lceil \ln \frac{1}{\delta} \right\rceil
+\end{equation}
+the estimation error satisfies the canonical Count-Min bound via Markov's inequality:
+\begin{equation}
+    \Pr\left[ \hat{f}(x) \le f(x) + \epsilon \|f\|_1 \right] \ge 1 - \delta
+\end{equation}
+where $\|f\|_1 = N = \sum_{y} f(y)$ is the total stream volume.
+
+\subsection{Conservative Updating (CU-CMS)}
+While the standard Count-Min Sketch guarantees bounded error, it suffers from severe overestimation bias when applied to heavy-tailed Zipfian distributions. Infrequent elements (mice) repeatedly collide with dominant items (elephants), artificially inflating mouse counters.
+
+To mitigate this, Estan and Varghese~\cite{estan2002new} introduced \textbf{Conservative Updating} for multi-hash tables. Under Conservative Updating, when an element $x$ arrives with unit weight, we first read the current counters mapped by $x$:
+\begin{equation}
+    v_{\min} = \min_{1 \le i \le d} \mathbf{C}[i, h_i(x)]
+\end{equation}
+Instead of incrementing all $d$ rows, the update increments \textit{only} those counters currently equal to $v_{\min}$:
+\begin{equation}
+    \mathbf{C}[i, h_i(x)] \leftarrow \max\left( \mathbf{C}[i, h_i(x)],\; v_{\min} + 1 \right) \quad \forall i \in \{1, \dots, d\}
+\end{equation}
+Counters that have already been inflated by collisions with larger items are left unchanged. As shown in our empirical evaluation (Chapter~\ref{ch:result}), Conservative Updating preserves the no-undercount guarantee while reducing Weighted Absolute Percentage Error (WAPE) overestimation by more than $15\times$ on skewed streams.
+
+\subsection{Time-Decayed Summaries}
+In continuous monitoring, historical events must gradually lose weight to reflect current traffic patterns. Following Cohen and Kaplan~\cite{cohen2007summarizing}, our implementation supports exponential time-decay. At periodic intervals $\Delta t$, all counters in the sketch are scaled by a decay factor $\lambda \in (0, 1)$:
+\begin{equation}
+    \mathbf{C}[i, j] \leftarrow \lfloor \lambda \cdot \mathbf{C}[i, j] \rfloor \quad \forall i \in [d], j \in [w]
+\end{equation}
+This gives each event an effective half-life of $t_{1/2} = \frac{\Delta t \ln 2}{\ln(1/\lambda)}$, preventing counter overflow in unbounded streams.
+
+\begin{table}[htbp]
+\centering
+\begin{tabular}{l c c c c c}
+\toprule
+\textbf{Template} & \textbf{Width ($w$)} & \textbf{Depth ($d$)} & \textbf{Memory (KB)} & $\epsilon$ & $\delta$ \\
+\midrule
+Low    & 512   & 3 & 6.0   & 0.00531 & 0.0498 \\
+Medium & 2,048 & 5 & 40.0  & 0.00133 & 0.0067 \\
+High   & 8,192 & 7 & 224.0 & 0.00033 & 0.0009 \\
+\bottomrule
+\end{tabular}
+\caption{Count-Min Sketch precision templates with memory allocations and theoretical error bounds.}
+\label{tab:cms_templates_ch2}
+\end{table}
+
+\section{HyperLogLog (HLL) Cardinality Estimation}
+
+Estimating the number of distinct elements (cardinality) in an unbounded stream without storing unique keys is a classic problem in network monitoring and database query optimization.
+
+\subsection{Algorithmic Formulation}
+The HyperLogLog algorithm, developed by Flajolet et al.~\cite{hll} as an evolution of Durand and Flajolet's LogLog algorithm~\cite{durand2003loglog}, estimates cardinality using stochastic averaging over $m = 2^p$ register cells ($p \in \mathbb{N}$).
+
+For each arriving element $x$:
+\begin{enumerate}
+    \item Compute a 64-bit non-cryptographic hash digest $h(x) \in \{0, 1\}^{64}$.
+    \item Partition the hash into two bit-slices: the leading $p$ bits determine the register index $j \in \{0, 1, \dots, m-1\}$, and the remaining $64 - p$ bits form the bitstring $w$.
+    \item Compute $\rho(w)$, defined as the position of the leftmost 1-bit in $w$ (with $\rho(00\dots) = 64 - p + 1$).
+    \item Update the register via the idempotent maximum operator:
+    \begin{equation}
+        \mathbf{R}[j] \leftarrow \max\left( \mathbf{R}[j],\; \rho(w) \right)
+    \end{equation}
+\end{enumerate}
+
+\subsection{Cardinality Computation and Error Limits}
+The raw cardinality estimate $E$ is calculated using the normalized harmonic mean of the register values:
+\begin{equation}
+    E = \alpha_m \cdot m^2 \cdot \left( \sum_{j=0}^{m-1} 2^{-\mathbf{R}[j]} \right)^{-1}
+\end{equation}
+where $\alpha_m$ is an empirically derived bias-correction factor:
+\begin{equation}
+    \alpha_m = \left( m \int_0^\infty \left( \log_2 \left( \frac{2 + u}{1 + u} \right) \right)^m du \right)^{-1} \approx \frac{0.7213}{1 + 1.079/m} \quad (\text{for } m \ge 128)
+\end{equation}
+
+When the raw estimate $E \le \frac{5}{2}m$ and registers remain zero, small-range LinearCounting correction is applied:
+\begin{equation}
+    E^* = m \ln \left( \frac{m}{V} \right)
+\end{equation}
+where $V$ is the count of empty registers ($\mathbf{R}[j] = 0$).
+
+The theoretical relative standard error (RSE) of HyperLogLog depends strictly on the register count $m = 2^p$:
+\begin{equation}
+    \text{RSE} \approx \frac{1.04}{\sqrt{m}} = \frac{1.04}{2^{p/2}}
+\end{equation}
+Engineering optimizations by Heule et al.~\cite{heule2013hyperloglog} (HyperLogLog++) further refine bias correction for small and large cardinalities.
 
 \begin{table}[htbp]
 \centering
 \begin{tabular}{l c c c c}
 \toprule
-\textbf{Template} & \textbf{Width ($w$)} & \textbf{Depth ($d$)} & $\epsilon$ & $\delta$ \\
+\textbf{Template} & \textbf{Precision ($p$)} & \textbf{Registers ($m$)} & \textbf{Memory (KB)} & \textbf{Theoretical RSE} \\
 \midrule
-Low    & 512   & 3 & 0.0053 & 0.05 \\
-Medium & 2,048 & 5 & 0.0013 & 0.007 \\
-High   & 8,192 & 7 & 0.0003 & 0.0009 \\
+Low    & 10 & 1,024  & 1.0  & $\pm 3.25\%$ \\
+Medium & 12 & 4,096  & 4.0  & $\pm 1.62\%$ \\
+High   & 14 & 16,384 & 16.0 & $\pm 0.81\%$ \\
 \bottomrule
 \end{tabular}
-\caption{Count-Min Sketch parameter templates with corresponding error bounds.}
-\label{tab:cms_templates}
+\caption{HyperLogLog precision parameters, register counts, and theoretical standard errors.}
+\label{tab:hll_templates_ch2}
 \end{table}
 
-\section{HyperLogLog (HLL)}
+\section{Sliding-Window Misra--Gries and Heavy Hitters}
 
-Calculating unique occurrences in an unbounded continuous stream of IP addresses, session IDs, or user tokens is exceptionally demanding. The HyperLogLog algorithm, presented by Flajolet et al.~\cite{hll}, builds upon the earlier LogLog counting approach~\cite{durand2003loglog} and provides near-optimal cardinality estimation.
+Tracking the most frequent elements (heavy hitters or ``elephants'') in real time is vital for identifying DDoS attacks, viral topics, and resource hogs. The classic algorithm by Misra and Gries~\cite{misra} and related work by Charikar et al.~\cite{charikar2002frequent} and Cormode and Hadjieleftheriou~\cite{cormode2008finding} solve this in bounded space.
 
-\subsection{Algorithm}
-HLL employs stochastic averaging utilizing $m = 2^p$ indexable registers. For each stream element $x$:
+\subsection{Misra--Gries Counter Maintenance}
+The Misra--Gries algorithm maintains a dynamic map $\mathcal{M}$ containing at most $k-1$ candidate items and associated counters:
 \begin{enumerate}
-    \item Compute a hash $h(x)$.
-    \item Use the first $p$ bits of the hash to select a register index $j$.
-    \item Count the position of the leftmost 1-bit in the remaining bits, denoted $\rho(x)$.
-    \item Update: $\text{registers}[j] \leftarrow \max(\text{registers}[j], \rho(x))$.
+    \item When element $x$ arrives:
+    \begin{itemize}
+        \item If $x \in \mathcal{M}$, increment its counter: $\mathcal{M}[x] \leftarrow \mathcal{M}[x] + 1$.
+        \item Else if $|\mathcal{M}| < k - 1$, insert $x$ with initial count: $\mathcal{M}[x] \leftarrow 1$.
+        \item Else (all $k-1$ slots occupied), decrement all existing counters in $\mathcal{M}$ by 1, and evict any entries whose counter falls to 0.
+    \end{itemize}
 \end{enumerate}
 
-The cardinality estimate is computed via the harmonic mean:
+\subsection{Error Guarantees}
+In an arbitrary stream of $N$ events, each joint decrement operation reduces the total counter mass by $k-1$ and discards the arriving element, accounting for $k$ element occurrences in total. Because this joint reduction can occur at most $\lfloor N/k \rfloor$ times across the stream, the estimated frequency $\hat{f}(x)$ satisfies:
 \begin{equation}
-    E = \alpha_m \cdot m^2 \cdot \left( \sum_{j=0}^{m-1} 2^{-\text{registers}[j]} \right)^{-1}
+    f(x) - \frac{N}{k} \le \hat{f}(x) \le f(x)
 \end{equation}
-where $\alpha_m$ is a bias-correction constant.
+Any item appearing with frequency $f(x) > N/k$ is guaranteed to remain in $\mathcal{M}$ at the end of the stream.
 
-\subsection{Error Bound}
-The relative standard error of HLL is:
-\begin{equation}
-    \text{RSE} \approx \frac{1.04}{\sqrt{m}}
-\end{equation}
+\subsection{Sliding-Window Eviction for Non-Stationary Streams}
+In real-world networks, popular items change dynamically over time. An item that was popular an hour ago should not dominate the current heavy-hitter list. Our implementation extends Misra--Gries with a fixed-capacity sliding window of length $W$ (default $W = 10,000$ events) maintained via an in-memory double-ended queue. When the window is full, the oldest event is evicted from the candidate map, ensuring that heavy-hitter estimates reflect current traffic trends rather than stale historical volume.
 
-This permits near-perfect deduplication requiring mere kilobytes instead of megabytes of storage. The practical improvements to HLL proposed by Heule et al.~\cite{heule2013hyperloglog} are also applicable to our implementation.
-
-\subsection{Precision Levels Used}
 \begin{table}[htbp]
 \centering
 \begin{tabular}{l c c c}
 \toprule
-\textbf{Template} & \textbf{Precision ($p$)} & \textbf{Registers ($m$)} & \textbf{Error (\%)} \\
+\textbf{Template} & \textbf{Capacity ($k$)} & \textbf{Detection Threshold ($\theta = 1/k$)} & \textbf{Max Additive Error Bound} \\
 \midrule
-Low    & 10 & 1,024   & $\pm$3.2\% \\
-Medium & 12 & 4,096   & $\pm$1.6\% \\
-High   & 14 & 16,384  & $\pm$0.8\% \\
+Low    & 50  & $2.0\%$ of window & $W / 50$ \\
+Medium & 200 & $0.5\%$ of window & $W / 200$ \\
+High   & 500 & $0.2\%$ of window & $W / 500$ \\
 \bottomrule
 \end{tabular}
-\caption{HyperLogLog precision levels with corresponding register counts and error rates.}
-\label{tab:hll_precision}
+\caption{Misra--Gries configuration templates and corresponding detection thresholds.}
+\label{tab:mg_templates_ch2}
 \end{table}
 
-\section{Sliding-Window Misra--Gries}
+\section{Monoid Algebra in Distributed Summarization}
 
-Identifying the Top-N most frequent items within a telemetry stream is critical for alerting and anomaly detection. The classic Misra--Gries algorithm~\cite{misra} ensures deterministic heavy hitter tracking. Related work by Charikar et al.~\cite{charikar2002frequent} provides additional frequency estimation methods in the streaming model.
+A central theoretical pillar of this work is the application of abstract algebra to distributed stream aggregation. Following Agarwal et al.~\cite{agarwal2013mergeable}, we say a summary data structure is \textbf{mergeable} if two or more independently constructed summaries over disjoint data subsets can be combined into a single summary of the same size with identical or strictly controlled error bounds.
 
-\subsection{Algorithm}
-The algorithm maintains at most $k-1$ candidate items alongside their counts. When a new item $x$ arrives:
+\subsection{Algebraic Properties}
+Formally, a sketch family $\mathcal{S}$ forms an algebraic \textbf{Monoid} $(\mathcal{S}, \oplus, \mathbf{0})$ under a binary merge operator $\oplus$ if it satisfies:
 \begin{enumerate}
-    \item If $x$ is already a candidate, increment its count.
-    \item Else if there are fewer than $k-1$ candidates, add $x$ with count 1.
-    \item Else decrement all candidate counts by 1 and evict any candidates whose count reaches zero.
+    \item \textbf{Closure:} $\forall A, B \in \mathcal{S} \implies (A \oplus B) \in \mathcal{S}$.
+    \item \textbf{Associativity:} $(A \oplus B) \oplus C = A \oplus (B \oplus C) \quad \forall A, B, C \in \mathcal{S}$.
+    \item \textbf{Identity Element:} $\exists \mathbf{0} \in \mathcal{S}$ such that $A \oplus \mathbf{0} = \mathbf{0} \oplus A = A \quad \forall A \in \mathcal{S}$.
 \end{enumerate}
 
-\subsection{Guarantee}
-Any item appearing more than $N/k$ times in a stream of $N$ elements is guaranteed to be among the surviving candidates. The additive error on frequency estimates is bounded by $N/k$.
+Furthermore, if the merge operator is \textbf{commutative} ($A \oplus B = B \oplus A$), the summary is an Abelian Monoid. If it is \textbf{idempotent} ($A \oplus A = A$), the summary forms a bounded \textbf{join-semilattice}.
 
-\subsection{Sliding-Window Extension}
-In our implementation, a sliding window constraint ensures that only events within a recent time window contribute to the heavy hitter computation. This is essential for detecting \textit{concept drift} --- when the distribution of popular items changes over time. Old entries age out naturally, allowing the algorithm to react to new trends within seconds.
+\subsection{Significance for Distributed Stream Processing}
+In distributed stream architectures, Monoid properties eliminate the need for centralized coordinators or distributed write locks:
+\begin{itemize}
+    \item \textbf{Arbitrary Partition Order:} Associativity and commutativity guarantee that partial sketches can be gathered from worker nodes in arbitrary network arrival order without corrupting the merged state.
+    \item \textbf{Lock-Free Ingestion:} Because workers maintain independent local Monoid states, ingestion occurs at raw memory speed without inter-node synchronization.
+    \item \textbf{Fault-Tolerant Duplicate Safety:} Under HyperLogLog's idempotent join-semilattice ($\max(R_1, R_1) = R_1$), network retransmissions and speculative duplicate requests do not bias cardinality estimates.
+\end{itemize}
 
-\subsection{Parameter Templates Used}
-\begin{table}[htbp]
-\centering
-\begin{tabular}{l c c}
-\toprule
-\textbf{Template} & \textbf{$k$ (Candidates)} & \textbf{Error Bound} \\
-\midrule
-Low    & 50  & $N/50$ \\
-Medium & 200 & $N/200$ \\
-High   & 500 & $N/500$ \\
-\bottomrule
-\end{tabular}
-\caption{Misra--Gries parameter templates with corresponding error bounds.}
-\label{tab:mg_templates}
-\end{table}
+\section{Reinforcement Learning and Multi-Armed Bandits for Systems}
+
+Autonomous parameter adaptation in computer systems has evolved from heuristic rule-based thresholding toward formal reinforcement learning formulations~\cite{sutton2018reinforcement}.
+
+\subsection{Markov Decision Process (MDP) Formulation}
+A sequential control problem in a dynamic environment is formalized as a Markov Decision Process defined by the 5-tuple $(\mathcal{S}, \mathcal{A}, \mathcal{P}, \mathcal{R}, \gamma)$:
+\begin{itemize}
+    \item $\mathcal{S}$ is the set of system states.
+    \item $\mathcal{A}$ is the discrete action space.
+    \item $\mathcal{P}(s' \mid s, a) = \Pr[S_{t+1} = s' \mid S_t = s, A_t = a]$ is the state transition probability.
+    \item $\mathcal{R}(s, a, s')$ is the scalar reward signal returned upon taking action $a$ in state $s$.
+    \item $\gamma \in [0, 1)$ is the discount factor for future rewards.
+\end{itemize}
+
+The goal of the agent is to find an optimal policy $\pi^* : \mathcal{S} \rightarrow \mathcal{A}$ maximizing expected cumulative discounted return:
+\begin{equation}
+    G_t = \sum_{k=0}^{\infty} \gamma^k R_{t+k+1}
+\end{equation}
+
+\subsection{Tabular Q-Learning}
+When state transition probabilities $\mathcal{P}$ are unknown \textit{a priori}, model-free Temporal Difference learning provides an online solution. In Tabular Q-Learning, the agent maintains an action-value function $Q(s, a)$ estimating the expected return of taking action $a$ in state $s$ and following policy $\pi$ thereafter.
+
+Upon observing transition $(s_t, a_t, r_{t+1}, s_{t+1})$, the Q-value is updated via the Bellman optimality equation:
+\begin{equation}
+    Q(s_t, a_t) \leftarrow Q(s_t, a_t) + \alpha \left[ r_{t+1} + \gamma \max_{a' \in \mathcal{A}} Q(s_{t+1}, a') - Q(s_t, a_t) \right]
+\end{equation}
+where $\alpha \in (0, 1]$ is the learning rate.
+
+\subsection{Contextual Bandits (LinUCB)}
+When state transitions do not exhibit strong Markovian sequential dependencies, or when state spaces are continuous, Contextual Multi-Armed Bandits offer a sample-efficient alternative. Following Li et al.~\cite{li2010contextual}, the \textbf{LinUCB} algorithm assumes the expected reward of arm $a$ is linear in a $d$-dimensional feature vector $x_t \in \mathbb{R}^d$:
+\begin{equation}
+    \mathbb{E}[r_{t, a} \mid x_t] = x_t^\top \theta_a^*
+\end{equation}
+The agent maintains an empirical covariance matrix $\mathbf{A}_a = \mathbf{D}_a^\top \mathbf{D}_a + \mathbf{I}_d$ and response vector $b_a = \mathbf{D}_a^\top c_a$ per arm, computing ridge regression estimates $\hat{\theta}_a = \mathbf{A}_a^{-1} b_a$. At each step, it selects the arm maximizing the Upper Confidence Bound:
+\begin{equation}
+    a_t = \arg\max_{a \in \mathcal{A}} \left( \hat{\theta}_a^\top x_t + \alpha_{\text{ucb}} \sqrt{x_t^\top \mathbf{A}_a^{-1} x_t} \right)
+\end{equation}
+where $\alpha_{\text{ucb}} > 0$ controls the exploration bonus.
+
+\section{Tail Latency and Straggler Mitigation}
+
+In distributed systems performing parallel scatter-gather operations across $P$ nodes, overall query completion time is determined by the slowest responding worker (the straggler):
+\begin{equation}
+    T_{\text{query}} = \max_{i=1, \dots, P} T_i
+\end{equation}
+Dean and Barroso~\cite{dean2013tail} demonstrated that even when individual server latency follows a well-behaved distribution with a small straggler probability $p_{\text{strag}}$ (e.g., 5\%), the probability that a distributed query over $P$ independent partitions stalls increases exponentially:
+\begin{equation}
+    P(\text{Stall}) = 1 - (1 - p_{\text{strag}})^P
+\end{equation}
+
+For $P = 4$, $18.5\%$ of queries stall; for $P = 16$, $56\%$ stall. Dean and Barroso proposed \textbf{Hedged Requests} as a lightweight mitigation strategy: client proxies dispatch a request to a primary server, wait for a brief timeout $T_{\text{hedge}}$ (typically the 95th percentile latency), and if no reply has arrived, dispatch a duplicate request to a secondary replica. The first response to return satisfies the query, and the slower request is cancelled.
+
+In Chapter~\ref{ch:new}, we adapt this principle to distributed Monoid sketch aggregation, showing that hedged scatter-gather eliminates straggler tails with only $5.65\%$ additional network traffic.
+
+\section{Concept Drift in Non-Stationary Streams}
+
+In continuous data streams, the statistical distribution generating the events changes over time---a phenomenon known as \textbf{concept drift}~\cite{gama2014survey}. Drift can be abrupt (e.g., a network flash crowd or DDoS attack) or gradual (e.g., seasonal shifts in user search queries).
+
+Let $P_t(X)$ represent the probability distribution over items at time $t$. A drift event occurs between time intervals $t_1$ and $t_2$ if:
+\begin{equation}
+    P_{t_1}(X) \ne P_{t_2}(X)
+\end{equation}
+A standard non-parametric measure for quantifying distributional drift over discrete multinomial event domains is the \textbf{Total Variation Distance ($D_{\text{TV}}$)}:
+\begin{equation}
+    D_{\text{TV}}(P_1, P_2) = \frac{1}{2} \sum_{x \in \mathcal{X}} |P_1(x) - P_2(x)|
+\end{equation}
+where $D_{\text{TV}} \in [0, 1]$. In Chapter~\ref{ch:new}, we introduce an efficient algorithm that evaluates $D_{\text{TV}}$ over sliding-window Misra--Gries heavy-hitter summaries in $O(K)$ time, triggering proactive controller adaptations when distribution divergence exceeds critical thresholds.
