@@ -4,6 +4,7 @@ The complete experimental testbed was deployed and validated on an Apple Silicon
 
 \begin{table}[htbp]
 \centering
+\resizebox{\columnwidth}{!}{%
 \begin{tabular}{l l l}
 \toprule
 \textbf{Subsystem} & \textbf{Component / Framework} & \textbf{Version / Specification} \\
@@ -17,7 +18,8 @@ C++ Worker           & Native C++20, CMake 3.28      & librdkafka 2.3.0, xxHash 
 Real-Time Dashboard  & HTML5, CSS3, Vanilla JS       & Chart.js 4.4.1 (WebSockets / Polling) \\
 Testing Framework    & pytest 8.0, Catch2 v3         & 49 automated offline unit tests \\
 \bottomrule
-\end{tabular}
+\end{tabular}%
+}
 \caption{Software stack and experimental testbed specifications.}
 \label{tab:tech_stack}
 \end{table}
@@ -30,7 +32,7 @@ To provide live visibility into cluster operations, sketch health, and controlle
 
 \begin{figure}[htbp]
  \centering
- \includegraphics[width=0.95\textwidth]{Figures/dashboard_screenshot.png}
+ \includegraphics[width=0.88\textwidth]{Figures/dashboard_screenshot.png}
  \caption{Interactive operational dashboard showing the cluster telemetry and control plane. Visual panels display active controller modes (Q-Learning 108 MDP with Hedging), worker P99 response times against the 20~ms SLA threshold, per-worker CPU and memory utilization, live sketch estimates (HyperLogLog cardinality, Misra--Gries heavy hitters, Count-Min frequency), and real-time query exploration tools.}
  \label{fig:dashboard_screenshot}
 \end{figure}
@@ -69,6 +71,7 @@ To ensure code reliability and mathematical correctness without requiring active
 
 \begin{table}[htbp]
 \centering
+\resizebox{\columnwidth}{!}{%
 \begin{tabular}{l c l}
 \toprule
 \textbf{Subsystem} & \textbf{Tests} & \textbf{Verified Properties} \\
@@ -83,7 +86,8 @@ Scatter-Gather \& Monoids  & 8  & Associativity/identity laws, hedged request di
 \midrule
 \textbf{Total Offline Suite} & \textbf{49} & \textbf{100\% pass rate in $<$0.48 seconds} \\
 \bottomrule
-\end{tabular}
+\end{tabular}%
+}
 \caption{Automated unit testing matrix validating all Phase~1 and Phase~2 algorithmic components.}
 \label{tab:test_suite}
 \end{table}
@@ -140,8 +144,9 @@ To rigorously evaluate controller agility, the 40,000 events were divided into f
 \subsection{Quantitative Results and Comparative Analysis}
 Table~\ref{tab:phase2_benchmark} presents the empirical results measured across all five configurations.
 
-\begin{table}[H]
+\begin{table}[htbp]
 \centering
+\resizebox{\columnwidth}{!}{%
 \begin{tabular}{c l r r r r r r}
 \toprule
 \textbf{\#} & \textbf{Configuration} & \textbf{Reward} & \textbf{SLA Viol\%} & \textbf{P99 (ms)} & \textbf{CMS Err\%} & \textbf{Mem (KB)} & \textbf{Switches} \\
@@ -152,28 +157,31 @@ Table~\ref{tab:phase2_benchmark} presents the empirical results measured across 
 4 & LinUCB Bandit + Smart Router (Ph.2) & $+0.5466$ & $28.75\%$ & $70.77$  & $1.510\%$ & $90.7$  & $54$ \\
 5 & \textbf{Q-Learning RL + Smart (Ph.2)} & \textbf{$+0.5644$} & \textbf{$11.67\%$} & \textbf{$63.39$} & \textbf{$1.913\%$} & \textbf{$75.0$} & \textbf{$16$} \\
 \bottomrule
-\end{tabular}
+\end{tabular}%
+}
 \caption{Comprehensive performance comparison across 40,000 Zipfian events under multi-regime traffic bursts, memory pressure, and concept drift.}
 \label{tab:phase2_benchmark}
 \end{table}
 
-\begin{figure}[H]
+\begin{figure}[htbp]
     \centering
-    \includegraphics[width=0.88\textwidth]{Phase2/fig1_rl_convergence.png}
+    \includegraphics[width=0.82\textwidth]{Phase2/fig1_rl_convergence.png}
     \caption{Online reinforcement learning policy convergence across 120 multi-regime episodes. Tabular Q-Learning ($\gamma = 0.85$) systematically improves its cumulative reward, outperforming the myopic LinUCB bandit, the static template baseline, and the rule-based controller.}
     \label{fig:rl_convergence}
 \end{figure}
 
-\begin{figure}[H]
+\begin{figure}[htbp]
     \centering
-    \includegraphics[width=0.95\textwidth]{Phase2/fig2_controller_comparison.png}
+    \includegraphics[width=0.82\textwidth]{Phase2/fig2_controller_comparison.png}
     \caption{Multi-metric comparison of the five controller configurations across four key dimensions: composite Pareto reward, SLA violation percentage, empirical CMS WAPE error, and template switching frequency.}
     \label{fig:controller_comparison}
 \end{figure}
 
-\begin{figure}[H]
+\clearpage
+
+\begin{figure}[htbp]
     \centering
-    \includegraphics[width=0.86\textwidth]{Phase2/fig3_cu_cms_comparison.png}
+    \includegraphics[width=0.78\textwidth]{Phase2/fig3_cu_cms_comparison.png}
     \caption{Standard Count-Min Sketch (Phase~1) versus Conservative-Update Count-Min Sketch (Phase~2) under identical memory budgets ($512 \times 3$). Conservative updating reduces estimation error by more than $15\times$ (from $\approx 6.5\%$ to $\approx 0.4\%$).}
     \label{fig:cu_cms_comparison}
 \end{figure}
@@ -210,6 +218,7 @@ Primary workers answered sub-queries with baseline latency $\mu = 2.5\text{ ms}$
 
 \begin{table}[htbp]
 \centering
+\resizebox{\columnwidth}{!}{%
 \begin{tabular}{l r r r r r r r}
 \toprule
 \textbf{Execution Strategy} & \textbf{P50 (ms)} & \textbf{P90 (ms)} & \textbf{P95 (ms)} & \textbf{P99 (ms)} & \textbf{Max (ms)} & \textbf{Overhead} \\
@@ -218,14 +227,15 @@ Unhedged Scatter-Gather       & $3.37$ & $53.89$ & $63.89$ & $73.00$ & $74.90$ &
 Hedged ($T_{\text{hedge}} = 6.0\text{ ms}$) & $3.37$ & $8.53$  & $9.14$  & $9.99$  & $11.08$ & $4.85\%$ \\
 \textbf{Hedged ($T_{\text{hedge}} = 4.5\text{ ms}$)} & \textbf{$3.37$} & \textbf{$7.03$}  & \textbf{$7.64$}  & \textbf{$8.49$}  & \textbf{$9.58$}  & \textbf{$5.65\%$} \\
 \bottomrule
-\end{tabular}
+\end{tabular}%
+}
 \caption{Distributed scatter-gather tail latency percentiles across 1,500 queries over 4 partitions with 5\% worker straggler probability.}
 \label{tab:hedged_benchmark}
 \end{table}
 
-\begin{figure}[H]
+\begin{figure}[htbp]
     \centering
-    \includegraphics[width=0.95\textwidth]{Phase2/fig4_hedged_scatter_gather.png}
+    \includegraphics[width=0.85\textwidth]{Phase2/fig4_hedged_scatter_gather.png}
     \caption{Distributed scatter-gather tail latency distribution under worker stragglers. (a) Cumulative Distribution Function (CDF) showing unhedged queries suffering an extended straggler tail past $74\text{ ms}$, whereas hedged queries truncate latency at $\approx 8.5\text{ ms}$. (b) Latency percentiles illustrating an $>8.5\times$ reduction in P99 latency with only 5.65\% request overhead.}
     \label{fig:hedged_scatter_gather}
 \end{figure}

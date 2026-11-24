@@ -4,7 +4,7 @@ The architecture developed in this work addresses the dual challenges of high-ve
 
 \begin{figure}[htbp]
  \centering
- \includegraphics[width=0.95\textwidth]{Figures/architecture_diagram.png}
+ \includegraphics[width=0.85\textwidth]{Figures/architecture_diagram.png}
  \caption{End-to-end distributed system architecture. The pipeline integrates a Zipfian stream producer, a partitioned Kafka messaging backbone, dual-language analytical worker nodes (Python and C++20), an in-memory Redis telemetry blackboard, an asynchronous FastAPI query router with hedged scatter-gather execution, and an online Reinforcement Learning control plane.}
  \label{fig:arch_diagram}
 \end{figure}
@@ -72,6 +72,7 @@ Redis~\cite{redis} serves as the centralized communication blackboard connecting
 
 \begin{table}[htbp]
 \centering
+\resizebox{\columnwidth}{!}{%
 \begin{tabular}{l l l l}
 \toprule
 \textbf{Key Pattern} & \textbf{Data Structure} & \textbf{Producer} & \textbf{Consumer} \\
@@ -83,7 +84,8 @@ Redis~\cite{redis} serves as the centralized communication blackboard connecting
 \texttt{router:query\_log}            & List (Capped) & Query Router & Web Dashboard \\
 \texttt{cluster:topology}             & Set & Discovery Module & Query Router \\
 \bottomrule
-\end{tabular}
+\end{tabular}%
+}
 \caption{Redis telemetry and command key schema.}
 \label{tab:redis_keys}
 \end{table}

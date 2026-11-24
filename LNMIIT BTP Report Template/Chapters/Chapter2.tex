@@ -161,6 +161,7 @@ In real-world networks, popular items change dynamically over time. An item that
 
 \begin{table}[htbp]
 \centering
+\resizebox{\columnwidth}{!}{%
 \begin{tabular}{l c c c}
 \toprule
 \textbf{Template} & \textbf{Capacity ($k$)} & \textbf{Detection Threshold ($\theta = 1/k$)} & \textbf{Max Additive Error Bound} \\
@@ -169,7 +170,8 @@ Low    & 50  & $2.0\%$ of window & $W / 50$ \\
 Medium & 200 & $0.5\%$ of window & $W / 200$ \\
 High   & 500 & $0.2\%$ of window & $W / 500$ \\
 \bottomrule
-\end{tabular}
+\end{tabular}%
+}
 \caption{Misra--Gries configuration templates and corresponding detection thresholds.}
 \label{tab:mg_templates_ch2}
 \end{table}
